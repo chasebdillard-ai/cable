@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#06164a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Cable">
+<meta name="application-name" content="Cable">
 <title>Cable · Digital Cable</title>
 <meta name="description" content="Cable: free 24/7 live channels and ON DEMAND, the 2006 digital cable way.">
 <meta property="og:title" content="Cable · Digital Cable">
@@ -13,9 +15,10 @@
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://chasebdillard-ai.github.io/cable/og.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="app.css?v=1ab1b4a0">
+<link rel="stylesheet" href="app.css?v=7e4406b3">
 <link rel="preconnect" href="https://www.youtube.com">
 <link rel="preconnect" href="https://i.ytimg.com">
 </head>
@@ -25,6 +28,7 @@
     <div id="ytwrap"><div id="yt"></div></div>
     <video id="hls" playsinline webkit-playsinline preload="auto" hidden></video>
     <div id="snow" hidden><div class="snowtxt"><b>Technical difficulties</b><span>Please stand by</span></div></div>
+    <div id="bug" aria-hidden="true"><img alt="" decoding="async"><span></span></div>
     <div id="tap" aria-hidden="true"></div>
     <button id="unmute" type="button" hidden>Tap for sound</button>
   </div>
@@ -38,6 +42,7 @@
       <div class="bn-bar"><i></i></div>
       <div class="bn-next"></div>
     </div>
+    <div class="bn-act"><button type="button" class="bbtn rec" data-b="rec" aria-label="Record">&#9679; REC</button><button type="button" class="bbtn" data-b="cc" aria-label="Closed captions">CC</button></div>
   </div>
   <div id="numentry" hidden></div>
   <div id="toast" hidden></div>
@@ -52,6 +57,8 @@
       <button type="button" data-v="pp" class="fbtn">&#10074;&#10074; Pause</button>
       <button type="button" data-v="ff" class="fbtn">30 &#8635;</button>
       <button type="button" data-v="next" class="fbtn">Next &#9654;&#9654;</button>
+      <button type="button" data-v="cc" class="fbtn">CC</button>
+      <button type="button" data-v="rec" class="fbtn rec">&#9679; Rec</button>
     </div>
   </div>
 
@@ -61,16 +68,16 @@
       <div class="g-top">
         <div class="g-prev" id="gprev"></div>
         <div class="g-info">
-          <div class="g-brand"><span class="logo-cable">CABLE</span><span class="g-clock"></span></div>
+          <div class="g-brand"><img class="brand" src="cable-logo-w.svg" alt="cable"><span class="g-clock"></span></div>
           <div class="g-ititle"></div>
           <div class="g-imeta"></div>
           <div class="g-idesc"></div>
         </div>
       </div>
-      <div class="g-filter"><button type="button" class="g-fbtn" id="gfilter">Guide: All Channels &#9662;</button><span class="g-hint">&#9650;&#9660;&#9664;&#9654; Browse &nbsp; OK Tune &nbsp; &#9660;&#9660; Page</span></div>
+      <div class="g-filter"><button type="button" class="g-fbtn" id="gfilter">Guide: All Channels &#9662;</button><span class="g-hint">&#9650;&#9660;&#9664;&#9654; Browse &nbsp; OK Tune &nbsp; R Record &nbsp; &#9660;&#9660; Page</span></div>
       <div class="g-head"><div class="g-date"></div><div class="g-times"></div></div>
       <div class="g-rows" id="grows"></div>
-      <div class="g-foot"><button type="button" class="fbtn" data-g="live">Live TV</button><button type="button" class="fbtn" data-g="od">ON DEMAND</button><button type="button" class="fbtn" data-g="earlier">&#9664; Earlier</button><button type="button" class="fbtn" data-g="later">Later &#9654;</button></div>
+      <div class="g-foot"><button type="button" class="fbtn" data-g="live">Live TV</button><button type="button" class="fbtn" data-g="od">ON DEMAND</button><button type="button" class="fbtn" data-g="earlier">&#9664; Earlier</button><button type="button" class="fbtn" data-g="later">Later &#9654;</button><button type="button" class="fbtn rec" data-g="rec">&#9679; Rec</button></div>
     </div>
   </div>
 
@@ -86,8 +93,8 @@
         <div class="od-list" id="odlist" role="listbox"></div>
         <div class="od-side" id="odside"><div class="od-prev" id="odprev"></div><div class="od-art"></div><div class="od-info"></div></div>
       </div>
-      <div class="od-foot"><span>&#9650;&#9660; Select &nbsp; OK Choose &nbsp; &#9664; Back &nbsp; GUIDE Listings</span>
-        <span class="od-fbtns"><button type="button" class="fbtn" data-o="back">&#9664; Back</button><button type="button" class="fbtn" data-o="live">Live TV</button><button type="button" class="fbtn" data-o="guide">Guide</button></span></div>
+      <div class="od-foot"><span>&#9650;&#9660; Select &nbsp; OK Choose &nbsp; R Record &nbsp; &#9664; Back &nbsp; GUIDE Listings</span>
+        <span class="od-fbtns"><button type="button" class="fbtn" data-o="back">&#9664; Back</button><button type="button" class="fbtn" data-o="live">Live TV</button><button type="button" class="fbtn" data-o="guide">Guide</button><button type="button" class="fbtn" data-o="dvr">My DVR</button></span></div>
     </div>
   </div>
 
@@ -99,18 +106,25 @@
     <button type="button" data-r="od">ON DEMAND</button>
     <button type="button" data-r="info">INFO</button>
     <button type="button" data-r="last">LAST</button>
+    <button type="button" data-r="rec" class="rec" aria-label="Record">&#9679; REC</button>
+    <button type="button" data-r="dvr">MY DVR</button>
+    <button type="button" data-r="cc" aria-label="Closed captions">CC</button>
+    <button type="button" data-r="fs" aria-label="Full screen">FULL SCREEN</button>
   </div>
+
+  <!-- record / action dialog -->
+  <div id="dlg" hidden role="dialog" aria-modal="true"><div class="dlg-box"><div class="dlg-t"></div><div class="dlg-s"></div><div class="dlg-b"></div></div></div>
 
   <!-- power on -->
   <div id="power">
     <div class="pw-box">
-      <div class="pw-logo"><span class="logo-cable big">CABLE</span><div class="pw-sub">DIGITAL CABLE</div></div>
+      <div class="pw-logo"><img class="brand big" src="cable-logo-w.svg" alt="cable"><div class="pw-sub">DIGITAL CABLE</div></div>
       <div class="pw-load">Loading channel lineup&hellip;</div>
       <button type="button" id="pwbtn" class="fbtn big" disabled>&#9654; Press OK to watch TV</button>
-      <div class="pw-tips">Arrow keys / CH &#9650;&#9660; change channels &middot; G = Guide &middot; D = ON DEMAND &middot; I = Info &middot; type a channel number</div>
+      <div class="pw-tips">Arrow keys / CH &#9650;&#9660; change channels &middot; G = Guide &middot; D = ON DEMAND &middot; I = Info &middot; R = Record &middot; V = My DVR &middot; C = Captions &middot; type a channel number</div>
     </div>
   </div>
 </div>
-<script src="app.js?v=8ecaad77"></script>
+<script src="app.js?v=ef6bdc55"></script>
 </body>
 </html>

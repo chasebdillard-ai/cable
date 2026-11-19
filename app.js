@@ -7,10 +7,11 @@
   var IS_TV = /SMART-TV|SmartTV|Tizen|Web0S|webOS|AFT[A-Z]|CrKey|BRAVIA|Android TV|GoogleTV|AppleTV|HbbTV|NetCast|Roku|Silk\/.*TV|DTV|Large Screen/i.test(UA) || !!W.TVNative || /[?&]tv=1/.test(location.search);
   if (IS_TV) d.documentElement.classList.add("tv");
   var APPLE = /iP(hone|ad|od)/.test(UA) || (/Safari\//.test(UA) && /Apple/.test(navigator.vendor || "") && !/Chrome|Chromium|CriOS|Android/.test(UA));
-  var CAT = null, LIVE = null, SRC = [], SHOWS = [], PEOPLE = [], GEN = [], VV = [], CH = [];
+  var CAT = null, LIVE = null, SRC = [], SHOWS = [], PEOPLE = [], GEN = [], VV = [], CH = [], VIDX = {};
   var TYPEN = { E: "Episode", M: "Movie", D: "Documentary", S: "Special", K: "Marathon" };
   var S = { mode: "boot", ch: 0, last: 0, playing: null, vod: null, override: null, started: false, soundOK: false, bad: {} };
-  var LS = W.localStorage || { getItem: function () { return null; }, setItem: function () {} };
+  var LS = W.localStorage || { getItem: function () { return null; }, setItem: function () {}, removeItem: function () {} };
+  S.cc = LS.getItem("cable_cc") === "1"; // closed captions: OFF unless this device turned them on
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function now() { return (W.__cableNow ? W.__cableNow() : Date.now()) / 1000; }
   function hm(t) { var x = new Date(t * 1000), h = x.getHours(), m = x.getMinutes(); return (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "a" : "p"); }
@@ -23,13 +24,23 @@
   // ---------- data ----------
   function V(i) { var v = VV[i]; return { i: i, id: v[0], t: v[1], d: v[2], src: v[3], sh: v[4], s: v[5], e: v[6], ty: v[7], yr: v[8], up: v[9], g: v[10], cast: v[11] }; }
   function vtitle(v) { var sh = v.sh >= 0 ? SHOWS[v.sh].n : ""; return sh ? sh + (v.s || v.e ? " (S" + (v.s || "?") + (v.e ? ", E" + v.e : "") + ")" : "") + ": " + v.t : v.t; }
+  // real network logos (Wikimedia Commons / Wikipedia, downloaded into logos/): LIVE.logos[id] = [plate l|d, aspect, mono aspect]
+  var SRCLOGO = { AETV: "ae", NCIS: "cbs", CBS: "cbs", FortyEight: "cbs", SixtyMin: "cbs", TwoHalfMen: "cbs", Showtime: "showtime", History: "history", PawnStars: "history",
+    Lifetime: "lifetime", TLC: "tlc", MTVRealityUK: "mtv", MTVVault: "mtv", Discovery: "discovery", Science: "science", NatGeo: "natgeo", COPS: "realcops", TheCW: "thecw",
+    CWSports: "thecw", Reelz: "reelz", GSN: "gsn", OWN: "own", PBS: "pbs", PBSDocs: "pbs", Starz: "starz", WEtv: "wetv", Oxygen: "oxygen", BET: "bet",
+    PokemonTV: "kidswb", Pokemon: "kidswb", RegularShow: "cn", TotalDrama: "cn", AquaTeen: "cn", RickMorty: "cn" };
+  function lgInfo(id) { return LIVE && LIVE.logos && LIVE.logos[id]; }
+  function imgLogo(id, alt, extra) { var L = lgInfo(id); return '<span class="lg lgi ' + (L[0] === "d" ? "pd" : "pl") + (extra || "") + '"><img src="logos/' + id + '.png" alt="' + esc(alt) + '" decoding="async" style="aspect-ratio:' + L[1] + '"></span>'; }
   function logo(c, big) {
     var st = c.sty || ["#123", "#fff", "sans"];
-    if (c.id === "upn") return '<span class="lg sans" style="background:' + st[0] + ';padding:.2em .4em"><img src="upn.svg" alt="UPN"></span>';
+    if (lgInfo(c.id)) return imgLogo(c.id, c.name, c.hls ? " live" : "");
     return '<span class="lg ' + esc(st[2]) + (c.hls ? " live" : "") + '" style="background:' + st[0] + ";color:" + st[1] + '">' + esc(big ? c.name.length > 14 ? c.call : c.name : c.call) + "</span>";
   }
+  function srcLogoId(k) { var id = SRCLOGO[SRC[k] && SRC[k][0]]; return id && lgInfo(id) ? id : null; }
+  function srcLogo(k) { var id = srcLogoId(k); return id ? imgLogo(id, SRC[k][1]) : ""; }
   function prep() {
     SRC = CAT.src; SHOWS = CAT.shows; PEOPLE = CAT.people; GEN = CAT.genres; VV = CAT.v; CH = LIVE.ch;
+    VV.forEach(function (v, i) { VIDX[v[0]] = i; });
     CH.forEach(function (c, n) {
       c.idx = n;
       if (c.seq) { var p = [0], t = 0; c.seq.forEach(function (i) { t += VV[i][2]; p.push(t); }); c.pre = p; c.T = t; }
@@ -68,10 +79,11 @@
     var s = d.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; d.head.appendChild(s);
     W.onYouTubeIframeAPIReady = function () {
       YTP = new YT.Player("yt", { width: "100%", height: "100%", host: "https://www.youtube.com",
-        playerVars: { autoplay: 0, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: location.origin },
-        events: { onReady: function () { ytReady = true; var f = YTP.getIframe && YTP.getIframe(); if (f) { f.setAttribute("allow", "autoplay; encrypted-media"); f.setAttribute("tabindex", "-1"); }
+        playerVars: { autoplay: 0, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: location.origin,
+          cc_load_policy: S.cc ? 1 : 0, cc_lang_pref: "en" },
+        events: { onReady: function () { ytReady = true; var f = YTP.getIframe && YTP.getIframe(); if (f) { f.setAttribute("allow", "autoplay; encrypted-media"); f.setAttribute("tabindex", "-1"); f.setAttribute("aria-hidden", "true"); }
             if (ytQ) { var q = ytQ; ytQ = null; ytLoad(q.id, q.at); } },
-          onStateChange: onYTState, onError: onYTError } });
+          onStateChange: onYTState, onError: onYTError, onApiChange: function () { applyCC(); } } });
     };
   }
   var LOG = W.CABLE_LOG = [];
@@ -79,6 +91,7 @@
     LOG.push(["load", id, Math.round(start || 0), Date.now()]);
     if (!ytReady) { ytQ = { id: id, at: start }; return; }
     try { YTP.loadVideoById({ videoId: id, startSeconds: Math.max(0, Math.floor(start || 0)) }); if (S.soundOK) { YTP.unMute(); YTP.setVolume(100); } YTP.playVideo(); } catch (e) {}
+    S.ccFor = null; setTimeout(applyCC, 700); setTimeout(applyCC, 2200); refocus();
     clearTimeout(ytLoad.wd); ytLoad.wd = setTimeout(function () { // muted-autoplay fallback
       try { var st = YTP.getPlayerState(); if (st !== 1 && st !== 3) { YTP.mute(); YTP.playVideo(); $("#unmute").hidden = false; } } catch (e) {}
     }, 2500);
@@ -86,7 +99,7 @@
   function ytStop() { try { if (ytReady) YTP.pauseVideo(); } catch (e) {} }
   function onYTState(e) {
     LOG.push(["state", e.data, Date.now()]);
-    if (e.data === 1) { $("#snow").hidden = true; try { if (!YTP.isMuted()) $("#unmute").hidden = true; } catch (x) {} }
+    if (e.data === 1) { $("#snow").hidden = true; try { if (!YTP.isMuted()) $("#unmute").hidden = true; } catch (x) {} if (S.ccFor !== S.playing) { S.ccFor = S.playing; applyCC(); } refocus(); }
     if (e.data === 0) { // ended
       if (S.mode === "vod" || S.vod) return vodNext();
       S.override = null; tune(S.ch, { quiet: true });
@@ -103,6 +116,26 @@
     $("#snow").hidden = false; setTimeout(function () { $("#snow").hidden = true; }, 1500);
     S.playing = VV[n.i][0]; ytLoad(VV[n.i][0], 0); showBanner();
   }
+
+  // ---------- closed captions (default OFF; per-device choice; applied on every tune / next video) ----------
+  function applyCC() {
+    LOG.push(["cc", S.cc ? 1 : 0, Date.now()]);
+    if (ytReady) try {
+      if (S.cc) { YTP.loadModule("captions"); YTP.setOption("captions", "track", { languageCode: "en" }); }
+      else { YTP.setOption("captions", "track", {}); YTP.unloadModule("captions"); YTP.unloadModule("cc"); }
+    } catch (e) {}
+    hlsCC();
+  }
+  function hlsCC() {
+    var v = $("#hls"); if (!v) return;
+    try { for (var i = 0; i < v.textTracks.length; i++) { var t = v.textTracks[i]; if (/captions|subtitles/.test(t.kind) || !t.kind) t.mode = S.cc ? "showing" : "hidden"; } } catch (e) {}
+    if (hls) try { hls.subtitleDisplay = !!S.cc; if (!S.cc) hls.subtitleTrack = -1; } catch (e) {}
+  }
+  function toggleCC() { S.cc = !S.cc; LS.setItem("cable_cc", S.cc ? "1" : "0"); applyCC(); ccUI(); toast("Closed Captions " + (S.cc ? "ON" : "OFF")); }
+  function ccUI() { $$('[data-r="cc"],[data-b="cc"],[data-v="cc"]').forEach(function (b) { b.classList.toggle("on", !!S.cc); b.setAttribute("aria-pressed", S.cc ? "true" : "false"); b.textContent = S.cc ? "CC ON" : "CC OFF"; }); }
+  // the YouTube iframe must never keep keyboard focus (keys would go to YouTube, not the remote handler)
+  function refocus() { setTimeout(function () { var a = d.activeElement; if (a && a.tagName === "IFRAME") { try { a.blur(); } catch (e) {} try { W.focus(); } catch (e) {} if (d.body) { d.body.setAttribute("tabindex", "-1"); d.body.focus({ preventScroll: true }); } } }, 0); }
+  W.addEventListener("blur", function () { setTimeout(refocus, 30); });
 
   // ---------- HLS ----------
   var hls = null, hlsWd = null, hlsRetry = null;
@@ -139,13 +172,15 @@
       hlsLib().then(function () {
         if (CH[S.ch] !== me) return;
         if (!W.Hls || !Hls.isSupported()) { if (v.canPlayType("application/vnd.apple.mpegurl")) { v.onerror = fail; v.src = u; go(); watch(); } else fail(); return; }
-        hls = new Hls({ liveSyncDurationCount: 3, manifestLoadingMaxRetry: 2, levelLoadingMaxRetry: 3, fragLoadingMaxRetry: 3 });
+        hls = new Hls({ liveSyncDurationCount: 3, manifestLoadingMaxRetry: 2, levelLoadingMaxRetry: 3, fragLoadingMaxRetry: 3, subtitleDisplay: !!S.cc });
+        hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, hlsCC); hls.on(Hls.Events.NON_NATIVE_TEXT_TRACKS_FOUND, function () { setTimeout(hlsCC, 0); });
         hls.on(Hls.Events.ERROR, function (e, data) { if (!data.fatal) return; if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !medRec) { medRec = 1; try { hls.recoverMediaError(); } catch (x) { fail(); } return; } fail(); });
         hls.on(Hls.Events.MANIFEST_PARSED, go);
         hls.loadSource(u); hls.attachMedia(v); watch();
       }, function () { fail(); });
     }
-    v.onplaying = function () { $("#snow").hidden = true; if (!v.muted) $("#unmute").hidden = true; };
+    v.onplaying = function () { $("#snow").hidden = true; if (!v.muted) $("#unmute").hidden = true; hlsCC(); refocus(); };
+    try { v.textTracks.onaddtrack = function () { hlsCC(); }; } catch (e) {}
     play();
   }
   W.__cableHls = function () { return $("#hls"); };
@@ -163,8 +198,32 @@
       while (S.bad[VV[p.i][0]] && tries++ < 5) p = nextOf(c, p);
       S.playing = VV[p.i][0]; ytLoad(VV[p.i][0], Math.max(0, now() - p.start));
     }
+    if (c.hls) { setBug(null, ""); $("#bug").dataset.own = c.id; } else { setBug(c.id, c.call); $("#bug").dataset.own = ""; } // live feeds already burn in their own bug
     if (!o.quiet || S.mode === "tv") { if (S.mode === "tv") showBanner(); }
-    if (S.mode === "guide") guideInfo();
+    if (S.mode === "guide") { guideInfo(); gCur(); }
+    refocus();
+  }
+  // ---------- network "bug": see-through white logo, bottom-right of the picture (inside the 16:9 image, title-safe margin) ----------
+  function setBug(id, txt) {
+    var b = $("#bug"), im = $("img", b), sp = $("span", b), L = id && lgInfo(id);
+    b.dataset.id = id || ""; b.hidden = !id && !txt;
+    if (L) { if (im.getAttribute("src") !== "logos/" + id + "-w.png") im.src = "logos/" + id + "-w.png"; im.hidden = false; sp.textContent = ""; b.style.setProperty("--ar", L[2]); }
+    else { im.hidden = true; im.removeAttribute("src"); sp.textContent = txt || ""; b.style.setProperty("--ar", 2.2); }
+    placeBug();
+  }
+  function vodNet(i) { // the item's own network logo, else the live channel that carries it
+    var v = VV[i], id = srcLogoId(v[3]); if (id) return { id: id };
+    var chs = Object.keys((v[4] >= 0 ? IX().chShow[v[4]] : IX().chSrc[v[3]]) || {}).map(function (k) { return CH[k]; });
+    var c = chs.filter(function (c) { return lgInfo(c.id); })[0] || chs[0]; return c ? { id: lgInfo(c.id) ? c.id : null, txt: c.call } : { txt: "" };
+  }
+  function placeBug() { // geometry from the screen box only (no reads inside animation frames)
+    var sc = $("#screen"), b = $("#bug"), W0 = sc.offsetWidth, H0 = sc.offsetHeight; if (!W0 || !H0) return;
+    var vw = Math.min(W0, H0 * 16 / 9), vh = vw * 9 / 16, ar = +b.style.getPropertyValue("--ar") || 2;
+    var h = Math.max(10, vh * (ar > 2.6 ? .055 : ar > 1.6 ? .075 : .1)), w = Math.min(h * ar, vw * .17); h = w / ar;
+    var m = Math.max(4, vw * .035);
+    b.style.width = Math.round(w) + "px"; b.style.height = Math.round(h) + "px";
+    b.style.right = Math.round((W0 - vw) / 2 + m) + "px"; b.style.bottom = Math.round((H0 - vh) / 2 + m * .8) + "px";
+    b.style.fontSize = Math.round(h * .72) + "px";
   }
   function chUp(dx) { var n = S.ch, list = guideList(), k = list.indexOf(n); if (k < 0) k = 0; tune(list[(k + dx + list.length) % list.length]); }
   setInterval(function () { // keep live channels on schedule
@@ -191,6 +250,8 @@
       var nv = V(n.i);
       $(".bn-next", b).innerHTML = "<b>Next " + hm(n.start) + ":</b> " + esc(nv.sh >= 0 ? SHOWS[nv.sh].n + " - " + nv.t : nv.t);
     }
+    var rp = !c.hls && recState(c, S.override && S.override.ch === S.ch ? S.override : at(c, now())); $(".bn-title", b).classList.toggle("recd", !!(rp && (rp.one || rp.ser)));
+    recUI(); ccUI();
     b.hidden = false; clearTimeout(showBanner.t); if (!portrait()) showBanner.t = setTimeout(function () { b.hidden = true; }, ms || 5000);
     if (!IS_TV && matchMedia("(pointer:coarse)").matches) showRemote();
   }
@@ -200,15 +261,19 @@
   // ---------- screen placement ----------
   function place() {
     var sc = $("#screen"), r = null;
-    if (portrait()) { r = { left: 0, top: 0, width: innerWidth, height: innerWidth * 9 / 16 }; d.getElementById("tv").classList.add("portrait-bg"); }
+    if (portrait()) { var tv0 = d.getElementById("tv"), st = sat(); r = { left: 0, top: st, width: tv0.clientWidth, height: tv0.clientWidth * 9 / 16 }; tv0.classList.add("portrait-bg"); }
     else if (S.mode === "guide") r = $("#gprev").getBoundingClientRect();
     else if (S.mode === "od") { var pv = $("#odprev"); pv.style.display = "block"; r = pv.getBoundingClientRect(); }
     if (S.mode !== "od") $("#odprev").style.display = "none";
     if (r && r.width) { sc.style.left = r.left + "px"; sc.style.top = r.top + "px"; sc.style.width = r.width + "px"; sc.style.height = r.height + "px"; sc.style.zIndex = S.mode === "tv" || S.mode === "vod" ? 5 : 25; }
-    else { sc.style.left = "0"; sc.style.top = "0"; sc.style.width = "100vw"; sc.style.height = "100vh"; sc.style.zIndex = 5; }
+    else { sc.style.left = "0"; sc.style.top = "0"; sc.style.width = "100%"; sc.style.height = "100%"; sc.style.zIndex = 5; }
     if (!portrait()) d.getElementById("tv").classList.remove("portrait-bg");
+    placeBug();
   }
-  addEventListener("resize", function () { place(); if (S.mode === "guide") renderGuide(); });
+  function sat() { // safe-area inset top (env() can't be read from a custom property, so measure a probe)
+    if (!sat.p) { sat.p = d.createElement("div"); sat.p.style.cssText = "position:fixed;left:0;top:0;width:1px;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none"; d.body.appendChild(sat.p); }
+    return sat.p.offsetHeight || 0; }
+  var rzT = 0; addEventListener("resize", function () { cancelAnimationFrame(rzT); rzT = requestAnimationFrame(function () { place(); if (S.mode === "guide") { G.m = null; renderGuide(); } }); });
 
   // ---------- modes ----------
   function setMode(m) {
@@ -225,7 +290,7 @@
   }
 
   // ---------- guide ----------
-  var G = { row: 0, top: 0, t: 0, w0: 0, filter: "all", menu: null };
+  var G = { row: 0, top: 0, t: 0, w0: 0, filter: "all", menu: null, m: null, rows: {}, lo: 0, hi: -1, st: 0, list: null, n: 0 };
   var FILTERS = [["all", "All Channels"], ["fav", "Favorites"], ["Movie", "Movies"], ["Kids", "Kids & Animation"], ["Documentary", "Documentaries & Science"], ["True Crime", "True Crime"],
     ["Reality", "Reality"], ["Drama", "Drama & Comedy"], ["Game Show", "Game Shows"], ["Live", "Live Networks"]];
   var FMAP = { Kids: ["Kids", "Anime", "Animation"], Documentary: ["Documentary", "Science & Space", "History", "Nature & Wildlife", "Society & People"], Drama: ["Drama", "Comedy", "Sitcom", "Variety"] };
@@ -236,45 +301,96 @@
     var gs = FMAP[f] || [f];
     return CH.filter(function (c) { return c.g.some(function (g) { return gs.indexOf(g) >= 0; }); }).map(function (c) { return c.idx; });
   }
-  function rowsVisible() { var h = $("#grows").clientHeight || 300, fs = parseFloat(getComputedStyle($("#grows")).fontSize) || 14; return Math.max(4, Math.min(12, Math.floor(h / (fs * 3.1)))); }
-  function winLen() { return portrait() ? 3600 : 5400; }
+  // Guide grid: virtualised + natively scrolled. Only the visible channel rows (+ overscan) exist in the DOM; rows are absolutely positioned inside a
+  // spacer and recycled as you scroll. Touch/wheel = the browser's own (compositor, iOS momentum) scrolling; keys/remote = short rAF tweens.
+  var OVER = 4;
+  function gm() {
+    if (G.m) return G.m; var el = $("#grows"), h = el.clientHeight || 300, w = el.clientWidth || 600, fs = parseFloat(getComputedStyle(el).fontSize) || 14;
+    var n = Math.max(3, Math.min(12, Math.floor(h / (fs * 3.1)))), rh = Math.floor(h / n);
+    G.m = { h: h, w: w, n: n, rh: rh }; el.style.setProperty("--rh", rh + "px"); return G.m;
+  }
+  function rowsVisible() { return gm().n; }
+  function winLen() { var w = gm().w; return w < 520 ? 3600 : w > 1500 ? 7200 : 5400; }
   function openGuide() {
-    setMode("guide"); var t = now(); G.w0 = Math.floor(t / 1800) * 1800; G.t = t;
+    setMode("guide"); G.m = null; var t = now(); G.w0 = Math.floor(t / 1800) * 1800; G.t = t;
     var list = guideList(), k = list.indexOf(S.ch); if (k < 0) { G.filter = "all"; list = guideList(); k = list.indexOf(S.ch); }
     G.row = Math.max(0, k); var n = rowsVisible(); G.top = Math.max(0, Math.min(G.row - Math.floor(n / 2), list.length - n));
     renderGuide(); place();
   }
   function selProg() { var list = guideList(), c = CH[list[G.row]]; if (!c) return null; var p = c.hls ? { live: 1, start: G.w0, end: G.w0 + winLen() } : at(c, Math.max(G.t, G.w0)); return { c: c, p: p }; }
-  function renderGuide() {
+  function gRowHtml(r, list, fv, wl, w1) {
+    var c = CH[list[r]], cells = "", rh = G.m.rh;
+    progs(c, G.w0, w1).forEach(function (p) {
+      var a = Math.max(p.start, G.w0), b = Math.min(p.end, w1), L = (a - G.w0) / wl * 100, Wd = (b - a) / wl * 100;
+      if (Wd <= 0) return;
+      var label, sub, cls = "", rec = "";
+      if (p.live) { label = c.name + " - Live Feed"; sub = c.tag; cls = " live"; }
+      else { var v = V(p.i); label = v.sh >= 0 ? SHOWS[v.sh].n : v.t; sub = v.sh >= 0 ? v.t : TYPEN[v.ty] + (v.yr ? " (" + v.yr + ")" : ""); if (v.ty === "M") cls = " mv"; rec = recMark(c, p); }
+      cells += '<div class="g-cell' + cls + (rec ? " recd" : "") + '" data-r="' + r + '" data-t="' + (p.live ? G.w0 : p.start) + '" data-e="' + (p.live ? w1 : p.end) + '" style="left:' + L + "%;width:" + Wd + '%">' +
+        (p.start < G.w0 && !p.live ? '<span class="arr">&#9664;</span>' : "") + rec + esc(label) + "<small>" + esc(sub) + "</small></div>";
+    });
+    return '<div class="g-row' + (c.idx === S.ch ? " cur" : "") + '" data-r="' + r + '" data-c="' + c.idx + '" style="top:' + (r * rh) + 'px"><div class="g-ch" data-r="' + r + '"><span class="num">' + c.n + "</span>" + logo(c) +
+      (fv.indexOf(c.id) >= 0 ? '<span class="fav">&#9733;</span>' : "") + '</div><div class="g-prog">' + cells + "</div></div>";
+  }
+  function renderGuide() { // full refresh: header + every rendered row (window change, filter, clock tick, resize)
     if (S.mode !== "guide") return;
-    var list = guideList(), n = rowsVisible(), wl = winLen(), w1 = G.w0 + wl;
-    if (G.row >= list.length) G.row = list.length - 1;
-    if (G.row < G.top) G.top = G.row; if (G.row >= G.top + n) G.top = G.row - n + 1;
-    var dt = new Date(G.w0 * 1000);
+    var list = guideList(), m = gm(), n = m.n, wl = winLen(), gr = $("#grows");
+    if (G.row >= list.length) G.row = list.length - 1; if (G.row < 0) G.row = 0;
+    if (G.row < G.top) G.top = G.row; if (G.row >= G.top + n) G.top = G.row - n + 1; G.top = Math.max(0, Math.min(G.top, Math.max(0, list.length - n)));
+    var dt = new Date(G.w0 * 1000), th = "";
     $(".g-date").textContent = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()] + " " + (dt.getMonth() + 1) + "/" + dt.getDate();
-    var th = "";
     for (var k = 0; k < wl / 1800; k++) th += '<span style="left:' + (k * 1800 / wl * 100) + '%">' + hm(G.w0 + k * 1800) + "</span>";
     $(".g-times").innerHTML = th;
     $("#gfilter").innerHTML = "Guide: " + esc(FILTERS.filter(function (f) { return f[0] === G.filter; })[0][1]) + " &#9662;";
-    var fv = favs().ch, html = "";
-    for (var r = G.top; r < Math.min(list.length, G.top + n); r++) {
-      var c = CH[list[r]], cells = "";
-      progs(c, G.w0, w1).forEach(function (p) {
-        var a = Math.max(p.start, G.w0), b = Math.min(p.end, w1), L = (a - G.w0) / wl * 100, Wd = (b - a) / wl * 100;
-        if (Wd <= 0) return;
-        var sel = r === G.row && G.t >= p.start && G.t < p.end || (r === G.row && p.live);
-        var label, sub, cls = "";
-        if (p.live) { label = c.name + " - Live Feed"; sub = c.tag; cls = " live"; }
-        else { var v = V(p.i); label = v.sh >= 0 ? SHOWS[v.sh].n : v.t; sub = v.sh >= 0 ? v.t : TYPEN[v.ty] + (v.yr ? " (" + v.yr + ")" : ""); if (v.ty === "M") cls = " mv"; }
-        cells += '<div class="g-cell' + cls + (sel ? " sel" : "") + '" data-r="' + r + '" data-t="' + (p.live ? G.w0 : p.start) + '" style="left:' + L + "%;width:" + Wd + '%">' +
-          (p.start < G.w0 && !p.live ? '<span class="arr">&#9664;</span>' : "") + esc(label) + "<small>" + esc(sub) + "</small></div>";
-      });
-      html += '<div class="g-row' + (c.idx === S.ch ? " cur" : "") + '" data-r="' + r + '"><div class="g-ch" data-r="' + r + '"><span class="num">' + c.n + "</span>" + logo(c) +
-        (fv.indexOf(c.id) >= 0 ? '<span class="fav">&#9733;</span>' : "") + '</div><div class="g-prog">' + cells + "</div></div>";
-    }
-    var gr = $("#grows"); gr.style.setProperty("--rows", n); gr.innerHTML = html;
-    guideInfo();
+    var sp = $(".g-sp", gr); if (!sp) { sp = d.createElement("div"); sp.className = "g-sp"; gr.innerHTML = ""; gr.appendChild(sp); }
+    sp.innerHTML = ""; G.rows = {}; G.lo = 0; G.hi = -1; G.list = list; G.n = list.length;
+    sp.style.height = list.length * m.rh + "px";
+    G.ign = true; gr.scrollTop = G.top * m.rh; G.st = G.top * m.rh;
+    gSync(G.st); gSel(); guideInfo();
+    requestAnimationFrame(function () { G.ign = false; });
   }
+  function gSync(st) { // add/remove rows so [first-OVER, last+OVER] exist; never touches rows already on screen
+    var m = G.m, list = G.list; if (!m || !list) return;
+    var first = Math.floor(st / m.rh), lo = Math.max(0, first - OVER), hi = Math.min(list.length - 1, first + m.n + OVER);
+    if (lo === G.lo && hi === G.hi) return;
+    var sp = $("#grows .g-sp"), r, html = "", fv = favs().ch, wl = winLen(), w1 = G.w0 + wl;
+    for (r in G.rows) if (r < lo || r > hi) { G.rows[r].remove(); delete G.rows[r]; }
+    for (r = lo; r <= hi; r++) if (!G.rows[r]) html += gRowHtml(r, list, fv, wl, w1);
+    if (html) { var tmp = d.createElement("div"); tmp.innerHTML = html; while (tmp.firstChild) { var e = tmp.firstChild; G.rows[e.dataset.r] = e; sp.appendChild(e); } }
+    G.lo = lo; G.hi = hi; if (G.rows[G.row]) gSel();
+  }
+  function gSel() { // move the yellow highlight without re-rendering
+    $$("#grows .g-cell.sel").forEach(function (e) { e.classList.remove("sel"); });
+    var row = G.rows && G.rows[G.row]; if (!row) return;
+    var cells = $$(".g-cell", row), t = Math.max(G.t, G.w0), hit = cells.filter(function (e) { return +e.dataset.t <= t && t < +e.dataset.e; })[0] || cells[0];
+    if (hit) hit.classList.add("sel");
+  }
+  function gCur() { if (!G.rows) return; for (var r in G.rows) G.rows[r].classList.toggle("cur", +G.rows[r].dataset.c === S.ch); }
+  function gEnsure(ms) { // keep the selected row on screen; tween the scroll (remote/keyboard paging)
+    var n = G.m.n; if (G.row < G.top) G.top = G.row; if (G.row >= G.top + n) G.top = G.row - n + 1;
+    G.top = Math.max(0, Math.min(G.top, Math.max(0, G.n - n))); gTween(G.top * G.m.rh, ms);
+  }
+  function gTween(to, ms) {
+    var gr = $("#grows"), from = G.st; cancelAnimationFrame(G.tw);
+    if (Math.abs(to - from) < 1) return;
+    if (!ms) { G.ign = true; gr.scrollTop = to; G.st = to; gSync(to); requestAnimationFrame(function () { G.ign = false; }); return; }
+    var t0 = performance.now(); G.ign = true;
+    (function step(t) { var k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3), y = from + (to - from) * e; gr.scrollTop = y; G.st = y; gSync(y);
+      if (k < 1) G.tw = requestAnimationFrame(step); else requestAnimationFrame(function () { G.ign = false; }); })(t0);
+  }
+  // the grid's height depends on the info text above it: re-measure whenever the scroller's box actually changes size
+  if (W.ResizeObserver) new ResizeObserver(function () { if (S.mode !== "guide" || !G.m) return; var h = $("#grows").clientHeight, w = $("#grows").clientWidth; if (Math.abs(h - G.m.h) > 1 || Math.abs(w - G.m.w) > 1) { G.m = null; renderGuide(); } }).observe($("#grows"));
+  var gInfoQ = 0; function guideInfoSoon() { if (gInfoQ) return; gInfoQ = requestAnimationFrame(function () { gInfoQ = 0; guideInfo(); }); }
+  // native scrolling (touch momentum / wheel / trackpad): passive listener, all work batched into one rAF
+  var gRaf = 0, gIdleT = 0;
+  $("#grows").addEventListener("scroll", function () {
+    if (G.ign) return;
+    if (!gRaf) gRaf = requestAnimationFrame(function () { gRaf = 0; var st = $("#grows").scrollTop; G.st = st; gSync(st); });
+    clearTimeout(gIdleT); gIdleT = setTimeout(function () { // scrolling settled: keep the highlight inside the visible rows
+      var m = G.m; if (!m) return; G.top = Math.round(G.st / m.rh);
+      var r = Math.max(G.top, Math.min(G.row, G.top + m.n - 1)); if (r !== G.row) { G.row = r; gSel(); guideInfo(); }
+    }, 140);
+  }, { passive: true });
   function guideInfo() {
     if (S.mode !== "guide") return;
     $(".g-clock").textContent = clock();
@@ -287,23 +403,25 @@
     $(".g-idesc").textContent = (sh && sh.sum ? sh.sum.slice(0, 220) + (sh.sum.length > 220 ? "\u2026 " : " ") : "") + "Genre: " + gs + (cast ? ". Cast: " + cast : "") + ". From " + SRC[v.src][1] + ".";
   }
   function guideKey(k) {
-    var list = guideList(), sp;
+    var list = G.list || guideList(), sp;
     if (G.menu) return gmenuKey(k);
-    if (k === "up" || k === "down") { G.row = Math.max(0, Math.min(list.length - 1, G.row + (k === "up" ? -1 : 1))); renderGuide(); return; }
-    if (k === "pgup" || k === "pgdn") { var n = rowsVisible(); G.row = Math.max(0, Math.min(list.length - 1, G.row + (k === "pgup" ? -n : n))); G.top = Math.max(0, Math.min(G.row, list.length - n)); renderGuide(); return; }
+    if (k === "up" || k === "down") { var r0 = G.row; G.row = Math.max(0, Math.min(list.length - 1, G.row + (k === "up" ? -1 : 1))); if (r0 !== G.row) { gEnsure(90); gSel(); guideInfoSoon(); } return; }
+    if (k === "pgup" || k === "pgdn") { var n = rowsVisible(); G.row = Math.max(0, Math.min(list.length - 1, G.row + (k === "pgup" ? -n : n))); G.top = Math.max(0, Math.min(G.row, list.length - n)); gEnsure(220); gSel(); guideInfoSoon(); return; }
     if (k === "right") {
-      sp = selProg(); var t2 = sp.p.end; if (sp.c.hls) t2 = G.w0 + winLen();
+      sp = selProg(); var t2 = sp.p.end, w0 = G.w0; if (sp.c.hls) t2 = G.w0 + winLen();
       G.t = t2 + 1; if (G.t >= G.w0 + winLen()) G.w0 += 1800; if (G.w0 > now() + 86400) G.w0 = Math.floor(now() / 1800) * 1800 + 86400;
-      renderGuide(); return;
+      if (G.w0 !== w0) renderGuide(); else { gSel(); guideInfo(); } return;
     }
     if (k === "left") {
-      sp = selProg(); var t1 = sp.p.start - 1, min = Math.floor(now() / 1800) * 1800;
+      sp = selProg(); var t1 = sp.p.start - 1, min = Math.floor(now() / 1800) * 1800, w0b = G.w0;
       if (sp.c.hls || t1 < min) { if (G.w0 > min) { G.w0 -= 1800; G.t = Math.max(now(), G.w0); } else { setFilterMenu(); return; } } else { G.t = Math.max(t1, now()); if (G.t < G.w0) G.w0 = Math.max(min, G.w0 - 1800); }
-      renderGuide(); return;
+      if (G.w0 !== w0b) renderGuide(); else { gSel(); guideInfo(); } return;
     }
-    if (k === "ok") { sp = selProg(); if (!sp) return; if (sp.c.hls || sp.p.start <= now() + 1) { tune(sp.c.idx); goLive(); } else { toast(hm(sp.p.start) + ": " + (V(sp.p.i).sh >= 0 ? SHOWS[V(sp.p.i).sh].n : V(sp.p.i).t) + " - not on yet. Find it in ON DEMAND."); } return; }
+    if (k === "ok") { sp = selProg(); if (!sp) return; if (sp.c.hls || sp.p.start <= now() + 1) { tune(sp.c.idx); goLive(); } else { toast(hm(sp.p.start) + ": " + (V(sp.p.i).sh >= 0 ? SHOWS[V(sp.p.i).sh].n : V(sp.p.i).t) + " - not on yet. Press R to record it, or find it in ON DEMAND."); } return; }
+    if (k === "rec") { sp = selProg(); if (sp) recDialog(sp.c, sp.p); return; }
     if (k === "back" || k === "guide") return goLive();
     if (k === "od") return openOD();
+    if (k === "dvr") return openDVR();
   }
   function setFilterMenu() {
     var m = d.createElement("div"); m.className = "g-menu";
@@ -320,15 +438,12 @@
   }
   $("#grows").addEventListener("click", function (e) {
     var cell = e.target.closest(".g-cell"), ch = e.target.closest(".g-ch");
-    if (cell) { var r = +cell.dataset.r, t = +cell.dataset.t; if (r === G.row && Math.abs(Math.max(t, now()) - Math.max(G.t, now())) < 2 || G.t >= t && r === G.row) { return guideKey("ok"); } G.row = r; G.t = Math.max(t, now()); renderGuide(); return; }
+    if (cell) { var r = +cell.dataset.r, t = +cell.dataset.t; if (r === G.row && cell.classList.contains("sel")) { return guideKey("ok"); } G.row = r; G.t = Math.max(t, now()); gSel(); guideInfo(); return; }
     if (ch) { G.row = +ch.dataset.r; G.t = now(); G.w0 = Math.floor(now() / 1800) * 1800; guideKey("ok"); }
   });
   $("#gfilter").addEventListener("click", function () { if (G.menu) { G.menu.el.remove(); G.menu = null; } else setFilterMenu(); });
   $(".g-foot").addEventListener("click", function (e) { var b = e.target.closest("[data-g]"); if (!b) return; var a = b.dataset.g;
-    if (a === "live") goLive(); else if (a === "od") openOD(); else if (a === "later") { G.w0 += 1800; G.t = Math.max(G.t, G.w0); renderGuide(); } else if (a === "earlier") { var min = Math.floor(now() / 1800) * 1800; G.w0 = Math.max(min, G.w0 - 1800); G.t = Math.max(now(), G.w0); renderGuide(); } });
-  var gwheel = 0; $("#grows").addEventListener("wheel", function (e) { e.preventDefault(); gwheel += e.deltaY; if (Math.abs(gwheel) > 40) { guideKey(gwheel > 0 ? "down" : "up"); gwheel = 0; } }, { passive: false });
-  var gty = null; $("#grows").addEventListener("touchstart", function (e) { gty = e.touches[0].clientY; }, { passive: true });
-  $("#grows").addEventListener("touchmove", function (e) { if (gty == null) return; var dy = e.touches[0].clientY - gty, h = ($(".g-row") || {}).clientHeight || 40; if (Math.abs(dy) > h) { var list = guideList(), steps = Math.round(-dy / h); G.top = Math.max(0, Math.min(list.length - rowsVisible(), G.top + steps)); G.row = Math.max(G.top, Math.min(G.row, G.top + rowsVisible() - 1)); gty = e.touches[0].clientY; renderGuide(); } }, { passive: true });
+    if (a === "live") goLive(); else if (a === "od") openOD(); else if (a === "rec") guideKey("rec"); else if (a === "later") { G.w0 += 1800; G.t = Math.max(G.t, G.w0); renderGuide(); } else if (a === "earlier") { var min = Math.floor(now() / 1800) * 1800; G.w0 = Math.max(min, G.w0 - 1800); G.t = Math.max(now(), G.w0); renderGuide(); } });
 
   // ---------- favorites + members ----------
   var SB = "https://cubbuiahnhgfpdeubldu.supabase.co", SBK = "sb_publishable_Sj8SNl5Zi0AwjxsIrNGNtQ_B--yHhYi", SKEY = "hvplus_session", PHONE_DOMAIN = "phone.blockbuster-plus.app";
@@ -339,6 +454,144 @@
   function toggleFav(kind, id) { var f = favs(), a = f[kind], k = a.indexOf(id); if (k >= 0) a.splice(k, 1); else a.push(id); setFavs(f); toast(k >= 0 ? "Removed from Favorites" : "Added to Favorites \u2605"); }
   function sbAuth(path, body) { return fetch(SB + "/auth/v1/" + path, { method: "POST", headers: { apikey: SBK, "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }); }
   function idToEmail(x) { x = (x || "").trim(); if (x.indexOf("@") > 0) return x.toLowerCase(); var dg = x.replace(/\D/g, ""); if (dg.length === 10) dg = "1" + dg; return dg.length >= 11 ? "p" + dg + "@" + PHONE_DOMAIN : x; }
+
+
+  // ---------- DVR / RECORD (a 2006 Comcast-style DVR that is really a watchlist: "recorded" programs play from the start, on demand) ----------
+  // Stored per account (signed-in member id, else "guest") in this device's localStorage: cable_dvr_<uid> = {r:[recordings], s:[series rules]}.
+  //  r: {v: YouTube id, ch: channel id ("" = from ON DEMAND), st/en: airtime (unix s), add}   s: {key: "sh:<show>" | "v:<id>", name, add, del:[ids deleted]}
+  var DV = { ver: 0, idx: null };
+  function dvrKey() { return "cable_dvr_" + uid(); }
+  function dvr() { try { var x = JSON.parse(LS.getItem(dvrKey()) || "null"); return x && x.r ? x : { r: [], s: [] }; } catch (e) { return { r: [], s: [] }; } }
+  function dvrSave(x) { LS.setItem(dvrKey(), JSON.stringify(x)); DV.ver++; DV.idx = null; dvrRefresh(); }
+  function serKey(i) { var v = VV[i]; return v[4] >= 0 ? "sh:" + SHOWS[v[4]].n : "v:" + v[0]; }
+  function serName(i) { var v = VV[i]; return v[4] >= 0 ? SHOWS[v[4]].n : v[1]; }
+  function dvrIdx() {
+    if (DV.idx) return DV.idx; var x = dvr(), one = {}, ser = {}, vids = {};
+    x.r.forEach(function (r) { if (r.ch) one[r.ch + ":" + r.st] = 1; vids[r.v] = 1; });
+    x.s.forEach(function (s) { ser[s.key] = s; });
+    return DV.idx = { one: one, ser: ser, vids: vids, x: x };
+  }
+  function recMark(c, p) { // red dot for a recorded airing, double dot for a series recording
+    if (!p || p.live) return ""; var X = dvrIdx();
+    if (X.one[c.id + ":" + p.start]) return '<i class="rd" title="Recording"></i>';
+    if (X.ser[serKey(p.i)]) return '<i class="rd rs" title="Series recording"></i>';
+    return "";
+  }
+  function recState(c, p) { var X = dvrIdx(); return { one: !!(c && p && !p.live && X.one[c.id + ":" + p.start]), ser: !!(p && !p.live && X.ser[serKey(p.i)]) }; }
+  function addRec(c, p) { var x = dvr(); if (!x.r.some(function (r) { return r.ch === (c ? c.id : "") && r.v === VV[p.i][0] && r.st === p.start; })) x.r.push({ v: VV[p.i][0], ch: c ? c.id : "", st: Math.round(p.start), en: Math.round(p.end), add: Math.round(now()) }); dvrSave(x); }
+  function delRec(c, p) { var x = dvr(); x.r = x.r.filter(function (r) { return !(r.ch === c.id && r.st === p.start); }); dvrSave(x); }
+  function addSeries(i) { var x = dvr(), k = serKey(i); if (!x.s.some(function (s) { return s.key === k; })) x.s.push({ key: k, name: serName(i), add: Math.round(now()), del: [] }); dvrSave(x); }
+  function delSeries(k) { var x = dvr(); x.s = x.s.filter(function (s) { return s.key !== k; }); dvrSave(x); }
+  function dvrRefresh() {
+    if (S.mode === "guide") renderGuide(); else if (S.mode === "od" && OD.stack.length) { var sc = cur(), keep = OD.sel; if (sc.rebuild) { sc.items = sc.rebuild().items; }
+      else sc.items = sc.items.map(function (it) { return it.vi != null ? vidItem(it.vi, it.ctx, it.opt) : it.showN != null && it.screen ? showItem(it.showN) : it; });
+      OD.sel = keep; render(); }
+    if (S.mode === "tv" && !$("#banner").hidden) showBanner(8000); recUI();
+  }
+  function recUI() { // light up the REC buttons when the program in front of you is being recorded
+    var on = false;
+    if (S.mode === "vod" && S.vod) on = !!dvrIdx().vids[S.vod.id];
+    else if (CH[S.ch] && !CH[S.ch].hls && LIVE) { var p = at(CH[S.ch], now()), st = recState(CH[S.ch], p); on = st.one || st.ser; }
+    $$('[data-r="rec"],[data-b="rec"],[data-v="rec"]').forEach(function (b) { b.classList.toggle("on", on); });
+  }
+  function recDialog(c, p) { // guide cell / banner / remote: the Comcast "Record" options box
+    if (!c || c.hls || !p || p.live) { toast("Live network feeds can't be recorded - try a scheduled channel"); return; }
+    var v = V(p.i), nm = v.sh >= 0 ? SHOWS[v.sh].n : v.t, st = recState(c, p), when = hm(p.start) + " - " + hm(p.end) + "  \u00b7  " + c.n + " " + c.call, btn = [];
+    if (!st.one) btn.push({ l: "\u25cf Record this " + (v.ty === "M" ? "movie" : "episode"), f: function () { addRec(c, p); toast(p.start > now() ? "Scheduled to record \u25cf " + hm(p.start) : "Recording \u25cf " + nm); } });
+    else btn.push({ l: "Cancel this recording", f: function () { delRec(c, p); toast("Recording cancelled"); } });
+    if (!st.ser) btn.push({ l: "\u25cf\u25cf Record series" + (v.sh >= 0 ? " (all airings of " + nm + ")" : " (every airing)"), f: function () { addSeries(p.i); toast("Series recording set \u25cf\u25cf " + nm); } });
+    else btn.push({ l: "Cancel series recording", f: function () { delSeries(serKey(p.i)); toast("Series recording cancelled"); } });
+    btn.push({ l: "Cancel", f: function () {} });
+    dialog("Record: " + (v.sh >= 0 ? nm + " - " + v.t : v.t), when, btn);
+  }
+  function recVodDialog(i) { // ON DEMAND item: "record" = keep it in My DVR
+    var v = V(i), X = dvrIdx(), has = !!X.vids[v.id], k = serKey(i), ser = !!X.ser[k], btn = [];
+    btn.push(has ? { l: "Delete from My DVR", f: function () { var x = dvr(); x.r = x.r.filter(function (r) { return r.v !== v.id; }); dvrSave(x); toast("Deleted from My DVR"); } }
+                 : { l: "\u25cf Record to My DVR", f: function () { addRec(null, { i: i, start: now(), end: now() + v.d }); toast("Recorded \u25cf " + (v.sh >= 0 ? SHOWS[v.sh].n + ": " : "") + v.t); } });
+    if (v.sh >= 0) btn.push(ser ? { l: "Cancel series recording", f: function () { delSeries(k); toast("Series recording cancelled"); } } : { l: "\u25cf\u25cf Record series (" + SHOWS[v.sh].n + ")", f: function () { addSeries(i); toast("Series recording set \u25cf\u25cf"); } });
+    btn.push({ l: "Cancel", f: function () {} });
+    dialog("Record: " + vtitle(v), mins(v.d) + "  \u00b7  " + SRC[v.src][1], btn);
+  }
+  // expand series rules into airings: recorded since the rule was set (max 7 days back), scheduled for the next 24 h
+  function seriesAirings(rule, t0, t1, cap) {
+    var out = [], seen = {}, isSh = rule.key.slice(0, 3) === "sh:", nm = rule.key.slice(isSh ? 3 : 2), del = rule.del || [];
+    CH.forEach(function (c) {
+      if (!c.seq) return; var p = at(c, t0), n = 0;
+      while (p.start < t1 && n++ < 1200 && out.length < cap) {
+        var v = VV[p.i], ok = isSh ? v[4] >= 0 && SHOWS[v[4]].n === nm : v[0] === nm;
+        if (ok && p.end > t0 && !seen[v[0] + (t1 > now() ? ":" + p.start : "")] && del.indexOf(v[0]) < 0) { seen[v[0] + (t1 > now() ? ":" + p.start : "")] = 1; out.push({ c: c, p: p, ser: rule.key }); }
+        p = nextOf(c, p);
+      }
+    });
+    return out;
+  }
+  function dvrEntries() {
+    var x = dvr(), t = now(), rec = [], sch = [], seenV = {};
+    x.r.forEach(function (r) { var i = VIDX[r.v]; if (i == null) return; var c = CH.filter(function (c) { return c.id === r.ch; })[0] || null;
+      var e = { i: i, c: c, p: { i: i, start: r.st, end: r.en }, one: r }; if (r.st > t) sch.push(e); else { rec.push(e); seenV[r.v] = 1; } });
+    x.s.forEach(function (rule) {
+      seriesAirings(rule, Math.max(rule.add, t - 7 * 86400), t, 200).forEach(function (a) { if (seenV[VV[a.p.i][0]]) return; seenV[VV[a.p.i][0]] = 1; rec.push({ i: a.p.i, c: a.c, p: a.p, ser: rule }); });
+      seriesAirings(rule, t, t + 86400, 30).forEach(function (a) { if (a.p.start > t) sch.push({ i: a.p.i, c: a.c, p: a.p, ser: rule }); });
+    });
+    rec.sort(function (a, b) { return b.p.start - a.p.start; }); sch.sort(function (a, b) { return a.p.start - b.p.start; });
+    return { rec: rec, sch: sch, rules: x.s };
+  }
+  function dvrWhen(e) { var dt = new Date(e.p.start * 1000); return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()] + " " + (dt.getMonth() + 1) + "/" + dt.getDate() + " " + hm(e.p.start); }
+  function dvrItem(e, ctx) {
+    var v = V(e.i), t = now(), status = e.p.start > t ? "Scheduled" : e.p.end > t && e.c ? "\u25cf Recording now" : "Recorded";
+    var lab = (v.sh >= 0 ? (v.s ? "S" + v.s + (v.e ? " E" + v.e : "") + " - " : "") + v.t : v.t);
+    var info = "<h3>" + esc(v.sh >= 0 ? SHOWS[v.sh].n : v.t) + "</h3>" + (v.sh >= 0 ? '<div class="m">' + esc(lab) + "</div>" : "") +
+      '<div><span class="k">Status:</span> <b class="' + (status === "Scheduled" ? "sch" : "rcd") + '">' + status + "</b>" + (e.ser ? " (series)" : "") + "</div>" +
+      (e.c ? '<div><span class="k">' + (status === "Scheduled" ? "Airs" : "Aired") + ":</span> " + dvrWhen(e) + " on " + e.c.n + " " + esc(e.c.name) + "</div>" : '<div><span class="k">From:</span> ON DEMAND</div>') +
+      '<div><span class="k">Length:</span> ' + mins(v.d) + '</div><p>' + (status === "Scheduled" ? "Becomes playable at airtime." : "OK: play from the start, or delete.") + "</p>";
+    return { label: (e.p.start > t ? "\u25f7 " : "") + (ctx === "flat" && v.sh >= 0 ? SHOWS[v.sh].n + ": " : "") + lab, count: e.c ? dvrWhen(e) : mins(v.d), art: thumb(v.id), ic: '<i class="rd' + (e.ser ? " rs" : "") + (e.p.start > t ? " sch" : "") + '"></i>', info: info,
+      go: function () { dvrAct(e); } };
+  }
+  function dvrAct(e) {
+    var v = V(e.i), t = now(), del = function () {
+      if (e.one) { var x = dvr(); x.r = x.r.filter(function (r) { return !(r.v === e.one.v && r.st === e.one.st && r.ch === e.one.ch); }); dvrSave(x); }
+      else if (e.ser) { var y = dvr(); y.s.forEach(function (s) { if (s.key === e.ser.key) (s.del = s.del || []).push(v.id); }); dvrSave(y); }
+      toast("Deleted"); };
+    if (e.p.start > t) return dialog("Scheduled: " + vtitle(v), dvrWhen(e) + (e.c ? " on " + e.c.n + " " + e.c.call : ""), [{ l: "Cancel this recording", f: del }, { l: "Keep", f: function () {} }]);
+    dialog(vtitle(v), "Recorded " + (e.c ? dvrWhen(e) + " \u00b7 " + e.c.call : "from ON DEMAND"), [{ l: "\u25b6 Play from start", f: function () { var ctx = dvrEntries().rec.map(function (x) { return x.i; }); playVod(e.i, ctx); } }, { l: "Delete recording", f: del }, { l: "Cancel", f: function () {} }]);
+  }
+  function dvrScreen() {
+    var E = dvrEntries(), items = [], groups = {}, order = [];
+    items.push({ hd: 1, label: "Recorded (" + E.rec.length + ")" });
+    E.rec.forEach(function (e) { var g = VV[e.i][4] >= 0 ? SHOWS[VV[e.i][4]].n : "\u00a7" + e.i; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(e); });
+    order.forEach(function (g) {
+      var l = groups[g]; if (l.length === 1) { items.push(dvrItem(l[0], "flat")); return; }
+      items.push({ label: g, count: l.length + " recorded", ic: "&#9632;", art: thumb(VV[l[0].i][0]), info: "<h3>" + esc(g) + "</h3><p>" + l.length + " recordings. OK to open.</p>",
+        screen: function () { var sc = { title: g, rebuild: function () { var ll = dvrEntries().rec.filter(function (e) { return VV[e.i][4] >= 0 && SHOWS[VV[e.i][4]].n === g; }); return { items: ll.length ? ll.map(function (e) { return dvrItem(e); }) : [{ hd: 1, label: "No recordings left" }] }; } }; sc.items = sc.rebuild().items; return sc; } });
+    });
+    if (!E.rec.length) items.push({ hd: 1, label: "Nothing recorded yet - press R or \u25cf REC on a program in the Guide, the info banner or ON DEMAND." });
+    items.push({ hd: 1, label: "Scheduled (" + E.sch.length + ")" });
+    E.sch.slice(0, 40).forEach(function (e) { items.push(dvrItem(e, "flat")); });
+    items.push({ hd: 1, label: "Series Recordings (" + E.rules.length + ")" });
+    E.rules.forEach(function (rule) { var n = E.rec.filter(function (e) { return e.ser && e.ser.key === rule.key; }).length;
+      items.push({ label: "\u25cf\u25cf " + rule.name, count: n + " recorded", ic: "", info: "<h3>Series: " + esc(rule.name) + '</h3><div class="m">Records every airing on every channel</div><p>Set ' + dvrWhen({ p: { start: rule.add } }) + ". OK to manage.</p>",
+        go: function () { dialog("Series: " + rule.name, n + " recorded", [{ l: "Cancel series recording", f: function () { delSeries(rule.key); toast("Series recording cancelled"); } }, { l: "Keep", f: function () {} }]); } }); });
+    return { title: "My DVR", items: items };
+  }
+  function openDVR() { var sc = dvrScreen(); sc.rebuild = function () { return dvrScreen(); }; setMode("od"); OD.stack = []; push(mainMenu()); push(sc); }
+
+  // ---------- action dialog (record options etc.): keys, remote and touch ----------
+  var DLG = null;
+  function dialog(title, sub, btns) {
+    var el = $("#dlg"); $(".dlg-t", el).textContent = title; $(".dlg-s", el).textContent = sub || "";
+    $(".dlg-b", el).innerHTML = btns.map(function (b, n) { return '<button type="button" class="fbtn' + (n === 0 ? " focus" : "") + '" data-n="' + n + '">' + esc(b.l) + "</button>"; }).join("");
+    DLG = { b: btns, k: 0 }; el.hidden = false;
+  }
+  function dlgClose() { $("#dlg").hidden = true; DLG = null; }
+  function dlgKey(k) {
+    var bs = $$("#dlg .dlg-b button");
+    if (k === "up" || k === "left") DLG.k = (DLG.k - 1 + bs.length) % bs.length;
+    else if (k === "down" || k === "right") DLG.k = (DLG.k + 1) % bs.length;
+    else if (k === "ok") { var f = DLG.b[DLG.k].f; dlgClose(); f(); return; }
+    else if (k === "back" || k === "rec") { dlgClose(); return; }
+    bs.forEach(function (b, n) { b.classList.toggle("focus", n === DLG.k); });
+  }
+  $("#dlg").addEventListener("click", function (e) { var b = e.target.closest("button[data-n]"); if (b && DLG) { DLG.k = +b.dataset.n; dlgKey("ok"); } else if (e.target.id === "dlg") dlgClose(); });
 
   // ---------- ON DEMAND ----------
   var OD = { stack: [], sel: 0, items: [], title: "" };
@@ -372,6 +625,7 @@
     var art = $(".od-art"), info = $(".od-info"); art.classList.remove("nope"); art.innerHTML = "";
     if (!it) { art.style.backgroundImage = ""; art.classList.add("nope"); info.innerHTML = ""; return; }
     if (it.art) art.style.backgroundImage = "url('" + it.art + "')"; else { art.style.backgroundImage = ""; art.classList.add("nope"); if (it.biglogo) art.innerHTML = it.biglogo; }
+    if (it.netlogo) art.innerHTML = '<span class="art-bug">' + imgLogo(it.netlogo, "") + "</span>";
     info.innerHTML = it.info || "<h3>" + esc(it.label) + "</h3>";
   }
   function odKey(k) {
@@ -386,11 +640,18 @@
     if (k === "ok" || k === "right") { var it = its[OD.sel]; if (!it || it.hd) return; if (k === "right" && !it.go && !it.screen) return; activate(it); return; }
     if (k === "left" || k === "back") return pop();
     if (k === "guide") return openGuide();
+    if (k === "rec") return odRec();
     if (k === "od") { OD.stack = []; push(mainMenu()); }
   }
   function activate(it) { if (it.screen) push(typeof it.screen === "function" ? it.screen() : it.screen); else if (it.go) it.go(); }
   $("#odlist").addEventListener("click", function (e) { var b = e.target.closest(".od-item[data-n]"); if (!b) return; var n = +b.dataset.n; if (n === OD.sel || matchMedia("(pointer:coarse)").matches) { OD.sel = n; highlight(); activate(cur().items[n]); } else { OD.sel = n; highlight(); } });
-  $(".od-foot").addEventListener("click", function (e) { var b = e.target.closest("[data-o]"); if (!b) return; var a = b.dataset.o; if (a === "back") pop(); else if (a === "live") goLive(); else openGuide(); });
+  $(".od-foot").addEventListener("click", function (e) { var b = e.target.closest("[data-o]"); if (!b) return; var a = b.dataset.o; if (a === "back") pop(); else if (a === "live") goLive(); else if (a === "dvr") openDVR(); else openGuide(); });
+  $("#odside").addEventListener("click", function (e) { var b = e.target.closest("[data-rec]"); if (b) recVodDialog(+b.dataset.rec); });
+  function odRec() { var it = cur().items[OD.sel]; if (!it || it.hd) return;
+    if (it.vi != null) return recVodDialog(it.vi);
+    if (it.showN != null) { var s = SHOWS[it.showN], on = !!dvrIdx().ser["sh:" + s.n]; return dialog("Series: " + s.n, s.vids.length + " episodes ON DEMAND", [on ? { l: "Cancel series recording", f: function () { delSeries("sh:" + s.n); toast("Series recording cancelled"); } } : { l: "\u25cf\u25cf Record series", f: function () { addSeries(s.vids[0]); toast("Series recording set \u25cf\u25cf " + s.n); } }, { l: "Cancel", f: function () {} }]); }
+    if (it.ch && !it.ch.hls) return recDialog(it.ch, at(it.ch, now()));
+    toast("Pick a program, show or episode to record"); }
 
   // item builders
   function vidItem(i, ctx, opt) {
@@ -401,12 +662,13 @@
       info: "<h3>" + esc(v.t) + "</h3>" + (sh ? '<div class="m">' + esc(sh.n) + (v.s ? " \u00b7 Season " + v.s + (v.e ? ", Episode " + v.e : "") : "") + "</div>" : "") +
         '<div class="m">' + TYPEN[v.ty] + " \u00b7 " + mins(v.d) + (v.yr ? " \u00b7 " + v.yr : "") + " \u00b7 FREE</div>" +
         '<div><span class="k">Network:</span> ' + esc(SRC[v.src][1]) + '</div><div><span class="k">Genre:</span> ' + esc(gs) + "</div>" + (cast ? '<div><span class="k">' + (v.cast.length ? "Starring" : "Cast") + ":</span> " + cast + "</div>" : "") +
-        (v.up ? '<div><span class="k">Added:</span> ' + v.up.slice(4, 6) + "/" + v.up.slice(6, 8) + "/" + v.up.slice(0, 4) + "</div>" : "") + "<p>Press OK to watch.</p>",
-      go: function () { playVod(i, ctx); } };
+        (v.up ? '<div><span class="k">Added:</span> ' + v.up.slice(4, 6) + "/" + v.up.slice(6, 8) + "/" + v.up.slice(0, 4) + "</div>" : "") +
+        "<p>Press OK to watch \u00b7 R to record.</p>" + '<p class="od-acts"><button type="button" class="fbtn rec' + (dvrIdx().vids[v.id] ? " on" : "") + '" data-rec="' + i + '">&#9679; ' + (dvrIdx().vids[v.id] ? "In My DVR" : "Record") + "</button></p>",
+      vi: i, ctx: ctx, opt: opt, ic: dvrIdx().vids[v.id] ? '<i class="rd"></i>' : "&#9654;", go: function () { playVod(i, ctx); } };
   }
   function showItem(n) {
     var s = SHOWS[n], f = s.vids[0], chs = Object.keys(IX().chShow[n] || {}).map(function (k) { return CH[k]; });
-    return { label: s.n, count: s.vids.length, art: s.img || (f != null ? thumb(VV[f][0]) : ""), ic: "&#9632;", screen: function () { return showScreen(n); },
+    return { label: s.n, count: s.vids.length, art: s.img || (f != null ? thumb(VV[f][0]) : ""), ic: dvrIdx().ser["sh:" + s.n] ? '<i class="rd rs"></i>' : "&#9632;", showN: n, logo: srcLogo(s.k), screen: function () { return showScreen(n); },
       info: "<h3>" + esc(s.n) + "</h3>" + '<div class="m">' + esc(SRC[s.k][1]) + (s.y ? " \u00b7 since " + s.y : "") + " \u00b7 " + s.vids.length + " full-length</div>" +
         (s.g.length ? '<div><span class="k">Genre:</span> ' + esc(s.g.join(", ")) + "</div>" : "") + (s.cast.length ? '<div><span class="k">Cast:</span> ' + s.cast.slice(0, 8).map(function (p) { return esc(PEOPLE[p]); }).join(", ") + "</div>" : "") +
         (chs.length ? '<div><span class="k">On live TV:</span> ' + chs.map(function (c) { return c.n + " " + esc(c.name); }).join(", ") + "</div>" : "") + (s.sum ? "<p>" + esc(s.sum) + "</p>" : "") };
@@ -419,6 +681,9 @@
     var ks = Object.keys(seasons).map(Number).sort(function (a, b) { return a - b; }), items = [], fv = favs().sh;
     var base = showItem(n);
     items.push({ label: (fv.indexOf(s.n) >= 0 ? "\u2605 Remove from Favorites" : "\u2606 Add to Favorites"), ic: "", art: base.art, info: base.info, go: function () { toggleFav("sh", s.n); render(); } });
+    var serOn = !!dvrIdx().ser["sh:" + s.n];
+    items.push({ label: serOn ? "Cancel Series Recording" : "\u25cf\u25cf Record Series", ic: serOn ? '<i class="rd rs"></i>' : "", art: base.art, showN: n, info: base.info + "<p>A series recording keeps every airing of " + esc(s.n) + " on any channel in My DVR.</p>",
+      go: function () { if (serOn) delSeries("sh:" + s.n); else if (s.vids.length) addSeries(s.vids[0]); toast(serOn ? "Series recording cancelled" : "Series recording set \u25cf\u25cf " + s.n); OD.stack[OD.stack.length - 1] = showScreen(n); render(); } });
     var chs = Object.keys(IX().chShow[n] || {}).map(function (k) { return CH[k]; });
     chs.slice(0, 3).forEach(function (c) { items.push({ label: "Watch live on " + c.n + " " + c.name, logo: logo(c), info: base.info, art: base.art, go: function () { tune(c.idx); goLive(); } }); });
     if (ks.length > 1 || (ks.length === 1 && nos.length)) {
@@ -438,7 +703,7 @@
     var sl = Object.keys(shs).map(Number).sort(function (a, b) { return SHOWS[b].vids.length - SHOWS[a].vids.length; });
     if (sl.length) { items.push({ hd: 1, label: "Shows" }); sl.forEach(function (n) { items.push(showItem(n)); }); }
     if (loose.length) { items.push({ hd: 1, label: "Movies, documentaries & specials" }); loose.slice(0, 400).forEach(function (i) { items.push(vidItem(i, loose)); }); }
-    return { title: SRC[k][1], items: items };
+    return { title: SRC[k][1], items: items, netlogo: srcLogoId(k) };
   }
   function deptScreen(dept) {
     var srcs = SRC.map(function (s, n) { return s[2] === dept ? n : -1; }).filter(function (n) { return n >= 0; });
@@ -446,7 +711,7 @@
     srcs.forEach(function (k) { (IX().bySrc[k] || []).forEach(function (i) { var x = VV[i][4]; if (x >= 0) { if (shs.indexOf(x) < 0) shs.push(x); } else loose.push(i); }); });
     shs.sort(function (a, b) { return SHOWS[b].vids.length - SHOWS[a].vids.length; });
     var items = [{ hd: 1, label: "Networks" }];
-    srcs.forEach(function (k) { var c = (IX().bySrc[k] || []).length; if (c) items.push({ label: SRC[k][1], count: c, ic: "&#9658;", screen: function () { return srcScreen(k); } }); });
+    srcs.forEach(function (k) { var c = (IX().bySrc[k] || []).length; if (c) items.push({ label: SRC[k][1], count: c, ic: srcLogo(k) ? "" : "&#9658;", logo: srcLogo(k), screen: function () { return srcScreen(k); } }); });
     if (shs.length) { items.push({ hd: 1, label: "Shows" }); shs.forEach(function (n) { items.push(showItem(n)); }); }
     if (loose.length) { loose.sort(function (a, b) { return VV[a][9] < VV[b][9] ? 1 : -1; }); items.push({ hd: 1, label: "Movies, documentaries & specials" }); loose.slice(0, 400).forEach(function (i) { items.push(vidItem(i, loose)); }); }
     return { title: dept, items: items };
@@ -496,7 +761,7 @@
           if (loose.length) { items.push({ hd: 1, label: "Movies & documentaries" }); loose.forEach(function (i) { items.push(vidItem(i, loose)); }); } return { title: dc + "s", items: items }; } }; }) };
   }
   function typeScreen() { var bt = IX().byType; return { title: "Program Type", items: ["E", "M", "D", "S", "K"].filter(function (t) { return (bt[t] || []).length; }).map(function (t) { return { label: TYPEN[t] + "s", count: bt[t].length, ic: "&#9658;", art: thumb(VV[bt[t][0]][0]), screen: function () { return listScreen(TYPEN[t] + "s (newest first)", bt[t], { withShow: true, max: 500 }); } }; }) }; }
-  function networksScreen() { var bs = IX().bySrc; return { title: "Networks", items: SRC.map(function (s, k) { return k; }).filter(function (k) { return (bs[k] || []).length; }).sort(function (a, b) { return SRC[a][1].localeCompare(SRC[b][1]); }).map(function (k) { return { label: SRC[k][1], count: bs[k].length, ic: "&#9658;", art: thumb(VV[bs[k][0]][0]), info: "<h3>" + esc(SRC[k][1]) + '</h3><div class="m">' + esc(SRC[k][2]) + " \u00b7 YouTube " + esc(SRC[k][4]) + "</div><p>" + bs[k].length + " free full-length programs.</p>", screen: function () { return srcScreen(k); } }; }) }; }
+  function networksScreen() { var bs = IX().bySrc; return { title: "Networks", items: SRC.map(function (s, k) { return k; }).filter(function (k) { return (bs[k] || []).length; }).sort(function (a, b) { return SRC[a][1].localeCompare(SRC[b][1]); }).map(function (k) { return { label: SRC[k][1], count: bs[k].length, ic: srcLogo(k) ? "" : "&#9658;", logo: srcLogo(k), art: thumb(VV[bs[k][0]][0]), netlogo: srcLogoId(k), info: (srcLogo(k) ? '<div class="od-netlogo">' + srcLogo(k) + "</div>" : "") + "<h3>" + esc(SRC[k][1]) + '</h3><div class="m">' + esc(SRC[k][2]) + " \u00b7 YouTube " + esc(SRC[k][4]) + "</div><p>" + bs[k].length + " free full-length programs.</p>", screen: function () { return srcScreen(k); } }; }) }; }
   function liveByGenreScreen() {
     var gs = {}; CH.forEach(function (c) { c.g.forEach(function (g) { (gs[g] = gs[g] || []).push(c); }); });
     var items = [{ label: "All channels (" + CH.length + ")", ic: "&#9632;", screen: function () { return { title: "All Channels", items: CH.map(chItem) }; } }, { hd: 1, label: "By genre" }];
@@ -507,7 +772,7 @@
     var info = "<h3>" + c.n + " " + esc(c.name) + '</h3><div class="m">' + esc(c.tag) + "</div>";
     if (!c.hls) { var p = at(c, now()), v = V(p.i), n = V(nextOf(c, p).i); info += '<div><span class="k">On now:</span> ' + esc(v.sh >= 0 ? SHOWS[v.sh].n + " - " + v.t : v.t) + '</div><div><span class="k">Next:</span> ' + esc(n.sh >= 0 ? SHOWS[n.sh].n : n.t) + "</div>"; }
     info += '<div><span class="k">Genres:</span> ' + esc(c.g.join(", ")) + "</div>";
-    return { label: c.n + "  " + c.name, logo: logo(c), biglogo: logo(c, 1), info: info, go: function () { tune(c.idx); goLive(); } };
+    return { label: c.n + "  " + c.name, logo: logo(c), biglogo: logo(c, 1), info: info, ch: c, go: function () { tune(c.idx); goLive(); } };
   }
   function recentScreen() { var l = VV.map(function (v, i) { return i; }).filter(function (i) { return VV[i][9]; }).sort(function (a, b) { return VV[a][9] < VV[b][9] ? 1 : -1; }).slice(0, 200); return listScreen("Recently Added", l, { withShow: true }); }
   function favScreen() {
@@ -524,7 +789,8 @@
     if (s && s.user) {
       var nm = (s.user.user_metadata || {}).display_name || "Member";
       return { title: "My Account", items: [{ label: "Signed in as " + nm, ic: "&#9679;", info: "<h3>Hi, " + esc(nm) + "</h3><p>Your Cable favorites are saved for this account on this device. Same account as your other sites.</p>" },
-        { label: "My Favorites", ic: "&#9733;", screen: favScreen }, { label: "Sign Out", ic: "&#9658;", go: function () { fetch(SB + "/auth/v1/logout", { method: "POST", headers: { apikey: SBK, Authorization: "Bearer " + s.access_token } }).catch(function () {}); LS.removeItem(SKEY); toast("Signed out"); pop(); } }] };
+        { label: "My DVR / Recordings", ic: '<i class="rd"></i>', go: openDVR, info: "<h3>My DVR</h3><p>Your recordings, scheduled recordings and series recordings. Recorded programs play from the start, any time.</p>" },
+      { label: "My Favorites", ic: "&#9733;", screen: favScreen }, { label: "Sign Out", ic: "&#9658;", go: function () { fetch(SB + "/auth/v1/logout", { method: "POST", headers: { apikey: SBK, Authorization: "Bearer " + s.access_token } }).catch(function () {}); LS.removeItem(SKEY); toast("Signed out"); pop(); } }] };
     }
     return { title: "Sign In", items: [{ label: "Sign in", ic: "&#9679;", go: function () { var f = $(".od-form input"); if (f) f.focus(); } }],
       pre: '<form class="od-form" autocomplete="on"><input name="id" placeholder="Email or phone" autocomplete="username"><input name="pw" type="password" placeholder="Password" autocomplete="current-password"><input name="nm" placeholder="Display name (new accounts)"><div style="display:flex;gap:.5em"><button class="fbtn" data-a="in">Sign In</button><button class="fbtn" data-a="up">Create Account</button></div><div class="msg"></div></form>',
@@ -595,6 +861,7 @@
       { label: "Live Channels by Genre", ic: "&#9632;", screen: liveByGenreScreen },
       { label: "Search", ic: "&#9658;", screen: function () { return searchScreen(""); } },
       { hd: 1, label: "Me" },
+      { label: "My DVR / Recordings", ic: '<i class="rd"></i>', go: openDVR, info: "<h3>My DVR</h3><p>Your recordings, scheduled recordings and series recordings. Recorded programs play from the start, any time.</p>" },
       { label: "My Favorites", ic: "&#9733;", screen: favScreen },
       { label: s && s.user ? "My Account" : "Sign In / Create Account", ic: "&#9679;", screen: accountScreen }
     ];
@@ -604,6 +871,7 @@
   // ---------- VOD ----------
   function playVod(i, ctx) {
     S.vod = { i: i, id: VV[i][0], ctx: ctx || [i] }; killHls(); setMode("vod"); S.playing = VV[i][0];
+    var nb = vodNet(i); setBug(nb.id, nb.txt); $("#bug").dataset.own = ""; recUI();
     ytLoad(VV[i][0], 0); vodBar();
   }
   function vodNext() {
@@ -619,11 +887,17 @@
   function vodTick() { if (!S.vod || !ytReady) return; try { var t = YTP.getCurrentTime() || 0, D = YTP.getDuration() || VV[S.vod.i][2]; $(".vb-t").textContent = dur(t); $(".vb-d").textContent = dur(D); $(".vb-prog i").style.width = (t / D * 100) + "%"; $('[data-v="pp"]').innerHTML = YTP.getPlayerState() === 1 ? "&#10074;&#10074; Pause" : "&#9654; Play"; } catch (e) {} }
   setInterval(function () { if (S.mode === "vod" && !$("#vodbar").hidden) vodTick(); }, 1000);
   function vodAct(a) {
+    if (a === "cc") { toggleCC(); return vodBar(); }
+    if (a === "rec") return S.vod && recVodDialog(S.vod.i);
+    if (a === "next") return vodNext();
+    if (a === "back") { S.vod = null; ytStop(); return openOD(); }
     if (!ytReady) return; try {
       if (a === "pp") { if (YTP.getPlayerState() === 1) YTP.pauseVideo(); else YTP.playVideo(); }
       if (a === "rw") YTP.seekTo(Math.max(0, YTP.getCurrentTime() - 30), true);
       if (a === "ff") YTP.seekTo(YTP.getCurrentTime() + 30, true);
       if (a === "next") return vodNext();
+      if (a === "cc") toggleCC();
+      if (a === "rec") return recVodDialog(S.vod.i);
       if (a === "back") { S.vod = null; ytStop(); return openOD(); }
     } catch (e) {}
     vodBar(); setTimeout(vodTick, 300);
@@ -639,6 +913,8 @@
     if (k === "up" || k === "down") return vodBar();
     if (k === "guide") { S.vod = null; return openGuide(); }
     if (k === "od") { S.vod = null; ytStop(); return openOD(); }
+    if (k === "rec") return recVodDialog(S.vod.i);
+    if (k === "pp") return vodAct("pp");
   }
 
   // ---------- input ----------
@@ -649,6 +925,12 @@
   }
   function key(k) {
     if (!S.started) { if (k === "ok") powerOn(); return; }
+    LOG.push(["key", k, S.mode, Date.now()]);
+    if (DLG) return dlgKey(k);
+    if (k === "cc") return toggleCC();
+    if (k === "fs") return toggleFS();
+    if (k === "dvr" && S.mode !== "vod") return openDVR();
+    if (k === "dvr") { S.vod = null; ytStop(); return openDVR(); }
     if (S.mode === "guide") return guideKey(k);
     if (S.mode === "od") return odKey(k);
     if (S.mode === "vod") return vodKey(k);
@@ -659,24 +941,36 @@
     if (k === "guide") return openGuide();
     if (k === "od") return openOD();
     if (k === "last") return tune(S.last);
+    if (k === "rec") { var c = CH[S.ch]; return recDialog(c, c.hls ? null : S.override && S.override.ch === S.ch ? S.override : at(c, now())); }
     if (k === "back") { if (!$("#banner").hidden) { $("#banner").hidden = true; return; } return tune(S.last); }
   }
+  function toggleFS() {
+    var de = d.documentElement, fe = d.fullscreenElement || d.webkitFullscreenElement;
+    try { if (fe) (d.exitFullscreen || d.webkitExitFullscreen).call(d); else (de.requestFullscreen || de.webkitRequestFullscreen).call(de); } catch (e) { toast("Full screen isn't available here"); }
+  }
+  ["fullscreenchange", "webkitfullscreenchange"].forEach(function (ev) { d.addEventListener(ev, function () { place(); refocus(); }); });
   var KEYMAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "ok", " ": "ok", Escape: "back", Backspace: "back", BrowserBack: "back", GoBack: "back",
     PageUp: "pgup", PageDown: "pgdn", ChannelUp: "chup", ChannelDown: "chdn", MediaTrackNext: "chup", MediaTrackPrevious: "chdn", g: "guide", G: "guide", ContextMenu: "guide", Guide: "guide",
-    d: "od", D: "od", i: "info", I: "info", Info: "info", l: "last", L: "last", "+": "chup", "-": "chdn", "=": "chup", MediaPlayPause: "pp" };
+    d: "od", D: "od", i: "info", I: "info", Info: "info", l: "last", L: "last", "+": "chup", "-": "chdn", "=": "chup", MediaPlayPause: "pp",
+    r: "rec", R: "rec", MediaRecord: "rec", v: "dvr", V: "dvr", c: "cc", C: "cc", Subtitle: "cc", ClosedCaptionToggle: "cc", f: "fs", F: "fs" };
   d.addEventListener("keydown", function (e) {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName) && !/Escape|ArrowUp|ArrowDown/.test(e.key)) return;
     if (/^[0-9]$/.test(e.key) && S.started && S.mode !== "od") { e.preventDefault(); return numKey(e.key); }
-    var k = KEYMAP[e.key] || (e.keyCode === 4 || e.keyCode === 461 || e.keyCode === 10009 ? "back" : e.keyCode === 427 ? "chup" : e.keyCode === 428 ? "chdn" : e.keyCode === 457 ? "info" : null);
+    var k = KEYMAP[e.key] || (e.keyCode === 4 || e.keyCode === 461 || e.keyCode === 10009 ? "back" : e.keyCode === 427 ? "chup" : e.keyCode === 428 ? "chdn" : e.keyCode === 457 ? "info" : e.keyCode === 416 ? "rec" : e.keyCode === 460 ? "cc" : null);
     if (!k) return;
     if (S.mode === "guide" && (k === "chup" || k === "chdn")) k = k === "chup" ? "pgup" : "pgdn";
     if (S.mode === "od" && (k === "chup" || k === "chdn")) k = k === "chup" ? "pgup" : "pgdn";
-    if (k === "pp") { if (S.mode === "vod") vodAct("pp"); return; }
+    if (k === "pp") { e.preventDefault(); if (S.mode === "vod" && !DLG) vodAct("pp"); return; }
     e.preventDefault(); e.stopPropagation(); key(k);
   }, true);
   $("#tap").addEventListener("click", function () { if (!S.started) return powerOn(); if (S.mode === "vod") return vodBar(); if (S.mode === "tv") { unmute(); showBanner(); showRemote(); } else if (S.mode === "guide") goLive(); else if (S.mode === "od") goLive(); });
-  $("#remote").addEventListener("click", function (e) { var b = e.target.closest("[data-r]"); if (!b) return; unmute(); var r = b.dataset.r; showRemote();
-    if (r === "up") chUp(1); else if (r === "down") chUp(-1); else if (r === "guide") openGuide(); else if (r === "od") openOD(); else if (r === "info") showBanner(8000); else if (r === "last") tune(S.last); });
+  $("#remote").addEventListener("click", function (e) { var b = e.target.closest("[data-r]"); if (!b) return; unmute(); var r = b.dataset.r; showRemote(); LOG.push(["remote", r, Date.now()]);
+    if (r === "up") chUp(1); else if (r === "down") chUp(-1); else if (r === "guide") openGuide(); else if (r === "od") openOD(); else if (r === "info") showBanner(8000);
+    else if (r === "last") tune(S.last); else if (r === "rec") key("rec"); else if (r === "dvr") openDVR(); else if (r === "cc") toggleCC(); else if (r === "fs") toggleFS(); });
+  $("#banner").addEventListener("click", function (e) { var b = e.target.closest("[data-b]"); if (!b) return; e.stopPropagation(); if (b.dataset.b === "cc") toggleCC(); else key("rec"); showBanner(8000); });
+  // a pressed on-screen button must not keep focus (Enter/OK would re-press it instead of reaching the remote handler)
+  d.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("button"); if (b && !b.closest(".od-form") && !b.closest(".od-search")) setTimeout(function () { try { b.blur(); } catch (x) {} }, 0); });
+  if (!d.documentElement.requestFullscreen && !d.documentElement.webkitRequestFullscreen) $$('[data-r="fs"]').forEach(function (b) { b.hidden = true; });
   function unmute() { S.soundOK = true; try { if (ytReady) { YTP.unMute(); YTP.setVolume(100); } } catch (e) {} var v = $("#hls"); if (!v.hidden) { v.muted = false; v.play().catch(function () {}); } $("#unmute").hidden = true; }
   $("#unmute").addEventListener("click", function (e) { e.stopPropagation(); unmute(); });
 
@@ -686,7 +980,7 @@
     setMode("tv"); tune(c.idx); showBanner(6000);
   }
   $("#pwbtn").addEventListener("click", powerOn);
-  setInterval(function () { if (S.mode === "guide") { renderGuide(); } else if (S.mode === "od") $(".od-clock").textContent = clock(); else if (!$("#banner").hidden) $(".bn-clock").textContent = clock(); }, 30000);
+  setInterval(function () { if (S.mode === "guide") { $(".g-clock").textContent = clock(); if (now() >= G.w0 + 1800 && Math.floor(now() / 1800) * 1800 > G.w0) { G.w0 = Math.floor(now() / 1800) * 1800; G.t = Math.max(G.t, now()); renderGuide(); } } else if (S.mode === "od") $(".od-clock").textContent = clock(); else if (!$("#banner").hidden) $(".bn-clock").textContent = clock(); }, 30000);
 
   // ---------- boot ----------
   loadYT();
@@ -695,7 +989,8 @@
     CAT = a[0]; LIVE = a[1]; prep();
     $(".pw-load").textContent = CH.length + " channels \u00b7 " + VV.length.toLocaleString() + " free programs ON DEMAND";
     var b = $("#pwbtn"); b.disabled = false; if (IS_TV) b.classList.add("focus"); try { b.focus(); } catch (e) {}
-    W.CABLE = { S: S, CH: CH, at: at, tune: tune, key: key, V: V, openOD: openOD, openGuide: openGuide, YTP: function () { return YTP; }, search: searchItems, push: push, screens: { peopleScreen: peopleScreen, genresScreen: genresScreen, decadeScreen: decadeScreen, typeScreen: typeScreen, networksScreen: networksScreen, azScreen: azScreen, searchScreen: searchScreen } };
+    ccUI(); recUI();
+    W.CABLE = { S: S, CH: CH, at: at, tune: tune, key: key, V: V, openOD: openOD, openGuide: openGuide, openDVR: openDVR, dvr: dvr, dvrEntries: dvrEntries, G: G, dlg: function () { return DLG; }, nextOf: nextOf, VIDX: VIDX, YTP: function () { return YTP; }, search: searchItems, push: push, screens: { peopleScreen: peopleScreen, genresScreen: genresScreen, decadeScreen: decadeScreen, typeScreen: typeScreen, networksScreen: networksScreen, azScreen: azScreen, searchScreen: searchScreen } };
     if (/[?&]autostart=1/.test(location.search)) powerOn();
   }).catch(function (e) { $(".pw-load").textContent = "Couldn't load the lineup - check your connection."; });
 })();
