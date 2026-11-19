@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06164a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Cable · Digital Cable</title>
+<meta name="description" content="Cable: free 24/7 live channels and ON DEMAND, the 2006 digital cable way.">
+<meta property="og:title" content="Cable · Digital Cable">
+<meta property="og:description" content="40 live channels, a real program guide and ON DEMAND - full episodes, movies and documentaries, free.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://chasebdillard-ai.github.io/cable/og.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="app.css?v=1ab1b4a0">
+<link rel="preconnect" href="https://www.youtube.com">
+<link rel="preconnect" href="https://i.ytimg.com">
+</head>
+<body>
+<div id="tv">
+  <div id="screen" class="screen">
+    <div id="ytwrap"><div id="yt"></div></div>
+    <video id="hls" playsinline webkit-playsinline preload="auto" hidden></video>
+    <div id="snow" hidden><div class="snowtxt"><b>Technical difficulties</b><span>Please stand by</span></div></div>
+    <div id="tap" aria-hidden="true"></div>
+    <button id="unmute" type="button" hidden>Tap for sound</button>
+  </div>
+
+  <!-- info banner (flip bar) -->
+  <div id="banner" class="banner" hidden>
+    <div class="bn-ch"><div class="bn-num"></div><div class="bn-logo"></div></div>
+    <div class="bn-main">
+      <div class="bn-top"><span class="bn-title"></span><span class="bn-clock"></span></div>
+      <div class="bn-sub"></div>
+      <div class="bn-bar"><i></i></div>
+      <div class="bn-next"></div>
+    </div>
+  </div>
+  <div id="numentry" hidden></div>
+  <div id="toast" hidden></div>
+
+  <!-- VOD control bar -->
+  <div id="vodbar" hidden>
+    <div class="vb-title"></div>
+    <div class="vb-row"><span class="vb-t">0:00</span><div class="vb-prog"><i></i></div><span class="vb-d">0:00</span></div>
+    <div class="vb-btns">
+      <button type="button" data-v="back" class="fbtn">&#9664; Back</button>
+      <button type="button" data-v="rw" class="fbtn">&#8634; 30</button>
+      <button type="button" data-v="pp" class="fbtn">&#10074;&#10074; Pause</button>
+      <button type="button" data-v="ff" class="fbtn">30 &#8635;</button>
+      <button type="button" data-v="next" class="fbtn">Next &#9654;&#9654;</button>
+    </div>
+  </div>
+
+  <!-- program guide -->
+  <div id="guide" class="panel" hidden>
+    <div class="safe">
+      <div class="g-top">
+        <div class="g-prev" id="gprev"></div>
+        <div class="g-info">
+          <div class="g-brand"><span class="logo-cable">CABLE</span><span class="g-clock"></span></div>
+          <div class="g-ititle"></div>
+          <div class="g-imeta"></div>
+          <div class="g-idesc"></div>
+        </div>
+      </div>
+      <div class="g-filter"><button type="button" class="g-fbtn" id="gfilter">Guide: All Channels &#9662;</button><span class="g-hint">&#9650;&#9660;&#9664;&#9654; Browse &nbsp; OK Tune &nbsp; &#9660;&#9660; Page</span></div>
+      <div class="g-head"><div class="g-date"></div><div class="g-times"></div></div>
+      <div class="g-rows" id="grows"></div>
+      <div class="g-foot"><button type="button" class="fbtn" data-g="live">Live TV</button><button type="button" class="fbtn" data-g="od">ON DEMAND</button><button type="button" class="fbtn" data-g="earlier">&#9664; Earlier</button><button type="button" class="fbtn" data-g="later">Later &#9654;</button></div>
+    </div>
+  </div>
+
+  <!-- ON DEMAND -->
+  <div id="od" class="panel" hidden>
+    <div class="safe">
+      <div class="od-head">
+        <div class="od-logo"><span class="odl1">ON</span><span class="odl2">DEMAND</span></div>
+        <div class="od-crumb"></div>
+        <div class="od-clock"></div>
+      </div>
+      <div class="od-body">
+        <div class="od-list" id="odlist" role="listbox"></div>
+        <div class="od-side" id="odside"><div class="od-prev" id="odprev"></div><div class="od-art"></div><div class="od-info"></div></div>
+      </div>
+      <div class="od-foot"><span>&#9650;&#9660; Select &nbsp; OK Choose &nbsp; &#9664; Back &nbsp; GUIDE Listings</span>
+        <span class="od-fbtns"><button type="button" class="fbtn" data-o="back">&#9664; Back</button><button type="button" class="fbtn" data-o="live">Live TV</button><button type="button" class="fbtn" data-o="guide">Guide</button></span></div>
+    </div>
+  </div>
+
+  <!-- touch remote -->
+  <div id="remote" hidden>
+    <button type="button" data-r="up" aria-label="Channel up">CH &#9650;</button>
+    <button type="button" data-r="down" aria-label="Channel down">CH &#9660;</button>
+    <button type="button" data-r="guide">GUIDE</button>
+    <button type="button" data-r="od">ON DEMAND</button>
+    <button type="button" data-r="info">INFO</button>
+    <button type="button" data-r="last">LAST</button>
+  </div>
+
+  <!-- power on -->
+  <div id="power">
+    <div class="pw-box">
+      <div class="pw-logo"><span class="logo-cable big">CABLE</span><div class="pw-sub">DIGITAL CABLE</div></div>
+      <div class="pw-load">Loading channel lineup&hellip;</div>
+      <button type="button" id="pwbtn" class="fbtn big" disabled>&#9654; Press OK to watch TV</button>
+      <div class="pw-tips">Arrow keys / CH &#9650;&#9660; change channels &middot; G = Guide &middot; D = ON DEMAND &middot; I = Info &middot; type a channel number</div>
+    </div>
+  </div>
+</div>
+<script src="app.js?v=8ecaad77"></script>
+</body>
+</html>
