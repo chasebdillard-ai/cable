@@ -669,7 +669,7 @@
   }
   function dvrEntries() {
     var x = dvr(), t = now(), rec = [], sch = [], seenV = {};
-    x.r.forEach(function (r) { var i = VIDX[r.v]; if (i == null) return; var c = CH.filter(function (c) { return c.id === r.ch; })[0] || null;
+    x.r.forEach(function (r) { var i = VIDX[r.v]; if (i == null) return; var c = r.ch ? chById(r.ch) : null; // chById follows live.json alias (retired ids: ballylive -> stadium, courttv -> courttvlive)
       var e = { i: i, c: c, p: { i: i, start: r.st, end: r.en }, one: r }; if (r.st > t) sch.push(e); else { rec.push(e); seenV[r.v] = 1; } });
     x.s.forEach(function (rule) {
       seriesAirings(rule, Math.max(rule.add, t - 7 * 86400), t, 200).forEach(function (a) { if (seenV[VV[a.p.i][0]]) return; seenV[VV[a.p.i][0]] = 1; rec.push({ i: a.p.i, c: a.c, p: a.p, ser: rule }); });
@@ -1157,7 +1157,7 @@
   $("#unmute").addEventListener("click", function (e) { e.stopPropagation(); unmute(); });
 
   /* last channel: stored by id in cable_chid. Older devices stored the channel NUMBER in cable_ch (before the 2026-11-20 renumber):
-     live.json "old" maps those numbers to ids and "alias" maps retired ids (ballylive -> stadium); migrated once, then cable_ch is removed. */
+     live.json "old" maps those numbers to ids and "alias" maps retired ids (ballylive -> stadium, courttv -> courttvlive); migrated once, then cable_ch is removed. */
   function chById(id) { id = (LIVE.alias || {})[id] || id; return CH.filter(function (c) { return c.id === id; })[0] || null; }
   function savedCh() {
     var id = LS.getItem("cable_chid"), c = id ? chById(id) : null;
