@@ -28,7 +28,7 @@
   var de = D.documentElement; de.classList.add("cable-gated");
   var css = D.createElement("style");
   css.textContent = "html.cable-gated body>*:not(#cable-gate):not(.hkd-m){display:none!important}html.cable-gated,html.cable-gated body{background:#020a2a!important;overflow:hidden!important}" +
-    "#cable-gate{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;" +
+    "#cable-gate{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;" +
     "background:radial-gradient(ellipse at 50% 35%,#163a9c 0%,#06164a 55%,#020a2a 100%);font-family:Verdana,Tahoma,sans-serif;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom))}" +
     "#cable-gate .cg-in{max-width:900px;width:100%}#cable-gate img{width:min(60vw,360px);height:auto;display:block;margin:0 auto 4vmin}" +
     "#cable-gate h1{font:bold clamp(20px,4.6vmin,46px)/1.2 Verdana,Tahoma,sans-serif;margin:0 0 1.2vmin;letter-spacing:.5px}" +

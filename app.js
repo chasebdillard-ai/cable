@@ -274,19 +274,20 @@
   function tuneHls(c) {
     var hadYT = S.picOK && $("#hls").hidden; killHls(); if (job) job.done = true; job = null; try { PL[act].mute(); } catch (e) {}
     if (!hadYT) { ytStop(); cover("tune"); }
-    var v = $("#hls"), srcs = c.hls.slice(), i = 0, round = 0, medRec = 0, me = c;
+    var v = $("#hls"), srcs = c.hls.slice(), i = 0, round = 0, medRec = 0, me = c, st0 = null;
     v.hidden = false; v.style.opacity = 0; v.muted = !(S.soundOK && hasGesture());
     function go() { var q = v.play(); if (q && q.catch) q.catch(function () { v.muted = true; needSound(); v.play().catch(function () {}); }); }
     function fail() {
       if (CH[S.ch] !== me) return;
       if (hls) { try { hls.destroy(); } catch (e) {} hls = null; } clearInterval(hlsWd);
-      i++; if (i < srcs.length) return play();
-      ytStop(); cover("snow"); toast(me.name + " isn't responding - retrying", 4000);
+      clearTimeout(st0); i++; if (i < srcs.length) return play();
+      v.hidden = true; ytStop(); cover("snow"); toast(me.name + " isn't responding - retrying", 4000);
       hlsRetry = setTimeout(function () { if (CH[S.ch] === me) { i = 0; round++; play(); } }, Math.min(60, 15 * (round + 1)) * 1000);
     }
     function watch() { var last = -1, still = 0; hlsWd = setInterval(function () { if (CH[S.ch] !== me || v.paused) { still = 0; return; } if (v.currentTime === last) { if (++still >= 2) fail(); } else { still = 0; last = v.currentTime; $("#snow").hidden = true; } }, 10000); }
     function play() {
-      if (CH[S.ch] !== me) return; medRec = 0; var u = srcs[i]; LOG.push(["hls", u, Date.now()]);
+      if (CH[S.ch] !== me) return; medRec = 0; var u = srcs[i]; LOG.push(["hls", u, Date.now()]); v.hidden = false;
+      clearTimeout(st0); if (IS_TV) st0 = setTimeout(function () { if (CH[S.ch] === me && v.style.opacity !== "1") fail(); }, 15000);
       if (/^yql:/.test(u)) {  // Yahoo video: resolve the current live URL from Yahoo's public streams API (CORS *), then play it
         fetch("https://video-api.yql.yahoo.com/v1/video/sapi/streams/" + u.slice(4) + "?protocol=http&format=m3u8&site=sports&region=US&lang=en-US").then(function (r) { return r.json(); }).then(function (j) {
           var st = j.query.results.mediaObj[0].streams[0]; srcs[i] = st.host + st.path.split("?")[0]; play();
@@ -303,7 +304,7 @@
         hls.loadSource(u); hls.attachMedia(v); watch();
       }, function () { fail(); });
     }
-    v.onplaying = function () { if (CH[S.ch] !== me) return; v.style.opacity = 1; ytStop(); S.picOK = true; cover(null); if (!v.muted) $("#unmute").hidden = true; else needSound(); hlsCC(); refocus(); };
+    v.onplaying = function () { clearTimeout(st0); if (CH[S.ch] !== me) return; v.style.opacity = 1; ytStop(); S.picOK = true; cover(null); if (!v.muted) $("#unmute").hidden = true; else needSound(); hlsCC(); refocus(); };
     try { v.textTracks.onaddtrack = function () { hlsCC(); }; } catch (e) {}
     play();
   }
@@ -1094,7 +1095,16 @@
     if (S.mode === "guide") return guideKey(k);
     if (S.mode === "od") return odKey(k);
     if (S.mode === "vod") return vodKey(k);
-    // tv
+    // tv. TV remotes (Fire TV, Google TV, Shield, Android TV) only have the D-pad: OK / Left / Right open an on-screen menu bar
+    // (Guide, On Demand, Record, My DVR, CC ...), Left/Right move along it, OK picks, Back closes. (2026-11-20)
+    if (IS_TV) {
+      var mo = !$("#remote").hidden && S.menu >= 0;
+      if (mo && (k === "left" || k === "right")) return menuMove(k === "right" ? 1 : -1);
+      if (mo && k === "ok") { var mb = menuBtns()[S.menu]; menuClose(); if (mb) remoteAct(mb.dataset.r); return; }
+      if (mo && k === "back") { menuClose(); $("#banner").hidden = true; return; }
+      if (mo && (k === "up" || k === "chup" || k === "down" || k === "chdn")) { chUp(k === "up" || k === "chup" ? 1 : -1); return menuArm(); }
+      if (k === "ok" || k === "left" || k === "right") { if (S.soundOK === false) unmute(); return menuOpen(); }
+    }
     if (k === "up" || k === "chup") return chUp(1);
     if (k === "down" || k === "chdn") return chUp(-1);
     if (k === "ok" || k === "info" || k === "left" || k === "right") { if (S.soundOK === false) unmute(); return showBanner(8000); }
@@ -1127,9 +1137,17 @@
     e.preventDefault(); e.stopPropagation(); key(k);
   }, true);
   $("#tap").addEventListener("click", function () { if (!S.started) return powerOn(); if (S.mode === "vod") return vodBar(); if (S.mode === "tv") { unmute(); showBanner(); showRemote(); } else if (S.mode === "guide") goLive(); else if (S.mode === "od") goLive(); });
-  $("#remote").addEventListener("click", function (e) { var b = e.target.closest("[data-r]"); if (!b) return; unmute(); var r = b.dataset.r; showRemote(); LOG.push(["remote", r, Date.now()]);
+  function menuBtns() { return $$("#remote [data-r]").filter(function (b) { return !b.hidden && b.offsetWidth > 0; }); }
+  function menuHi() { var l = menuBtns(); l.forEach(function (b, i) { b.classList.toggle("focus", i === S.menu); }); }
+  function menuArm() { clearTimeout(showRemote.t); showRemote.t = setTimeout(function () { menuClose(); }, 10000); var b = $("#banner"); b.hidden = false; clearTimeout(showBanner.t); showBanner.t = setTimeout(function () { b.hidden = true; }, 10000); }
+  function menuOpen() { $("#remote").hidden = false; showBanner(10000); var l = menuBtns(), g = 0; l.forEach(function (b, i) { if (b.dataset.r === "guide") g = i; }); S.menu = g; menuHi(); menuArm(); }
+  function menuMove(dir) { var n = menuBtns().length; if (!n) return; S.menu = (S.menu + dir + n) % n; menuHi(); menuArm(); }
+  function menuClose() { S.menu = -1; clearTimeout(showRemote.t); $("#remote").hidden = true; $$("#remote [data-r]").forEach(function (b) { b.classList.remove("focus"); }); }
+  W.__cableMenu = function () { return S.menu >= 0 && !$("#remote").hidden; };
+  $("#remote").addEventListener("click", function (e) { var b = e.target.closest("[data-r]"); if (!b) return; unmute(); var r = b.dataset.r; showRemote(); remoteAct(r); });
+  function remoteAct(r) { LOG.push(["remote", r, Date.now()]);
     if (r === "up") chUp(1); else if (r === "down") chUp(-1); else if (r === "guide") openGuide(); else if (r === "od") openOD(); else if (r === "info") showBanner(8000);
-    else if (r === "last") tune(S.last); else if (r === "rec") key("rec"); else if (r === "dvr") openDVR(); else if (r === "cc") toggleCC(); else if (r === "fs") toggleFS(); });
+    else if (r === "last") tune(S.last); else if (r === "rec") key("rec"); else if (r === "dvr") openDVR(); else if (r === "cc") toggleCC(); else if (r === "fs") toggleFS(); }
   $("#banner").addEventListener("click", function (e) { var b = e.target.closest("[data-b]"); if (!b) return; e.stopPropagation(); if (b.dataset.b === "cc") toggleCC(); else key("rec"); showBanner(8000); });
   // a pressed on-screen button must not keep focus (Enter/OK would re-press it instead of reaching the remote handler)
   d.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("button"); if (b && !b.closest(".od-form") && !b.closest(".od-search")) setTimeout(function () { try { b.blur(); } catch (x) {} }, 0); });
@@ -1142,7 +1160,7 @@
   function powerOn() {
     if (W.CABLE_GATE && W.CABLE_GATE.locked) return; // launch gate (gate.js): nothing plays before launch
     if (S.started || !CH.length) return; S.started = true; S.soundOK = true; $("#power").hidden = true;
-    var last = String(LS.getItem("cable_ch")), c = CH.filter(function (c) { return String(c.n) === last; })[0] || CH[0];
+    var last = String(LS.getItem("cable_ch")), c = CH.filter(function (c) { return String(c.n) === last; })[0] || (IS_TV && CH.filter(function (c) { return !c.hls; })[0]) || CH[0];
     setMode("tv"); tune(c.idx); showBanner(6000);
   }
   $("#pwbtn").addEventListener("click", powerOn);

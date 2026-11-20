@@ -3,30 +3,30 @@
 html,body{margin:0;height:100%;background:#000;color:#fff;font-family:Verdana,"DejaVu Sans",Tahoma,Geneva,Arial,sans-serif;-webkit-text-size-adjust:100%;overflow:hidden}
 button{font-family:inherit;color:inherit}
 [hidden]{display:none!important}
-#tv{position:fixed;inset:0;overflow:hidden;background:#000}
+#tv{position:fixed;top:0;right:0;bottom:0;left:0;overflow:hidden;background:#000}
 /* the one video surface; JS positions it (full screen / guide preview / portrait top strip) */
 .screen{position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:5;overflow:hidden;transition:none}
-#ytwrap,#ytwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#ytwrap,#ytwrap iframe{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;border:0}
 #ytwrap{overflow:hidden;background:#000}
 /* two players (A/B): only .on is visible. The player box is 4/3 taller than the screen, so a 16:9 picture still fills the screen exactly while
    YouTube's title bar (top) and logo / "Watch on YouTube" strip (bottom) fall outside it. During a YouTube ad the box goes back to normal so the ad's own UI shows. */
 .ytp{position:absolute;left:0;width:100%;top:-16.667%;height:133.333%;opacity:0;z-index:0}
 .ytp.on{opacity:1;z-index:1}
 #ytwrap.ad .ytp.on{top:0;height:100%}
-#cover{position:absolute;inset:0;z-index:2;background:#000;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;font-family:Verdana,Tahoma,sans-serif}
+#cover{position:absolute;top:0;right:0;bottom:0;left:0;z-index:2;background:#000;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;font-family:Verdana,Tahoma,sans-serif}
 #cover .cv-in{display:flex;flex-direction:column;align-items:center;gap:.5em}
-#cover .cv-num{font:bold clamp(28px,7vmin,72px)/1 Verdana,sans-serif;color:#ffcc00;letter-spacing:2px}
+#cover .cv-num{font:bold 7vmin/1 Verdana,sans-serif;font:bold clamp(28px,7vmin,72px)/1 Verdana,sans-serif;color:#ffcc00;letter-spacing:2px}
 #cover .cv-logo{max-width:40%;min-height:1em}#cover .cv-logo img{max-height:9vmin;max-width:100%}
-#cover .cv-txt{font-size:clamp(11px,2.2vmin,18px);color:#cfe0ff;letter-spacing:1px}
+#cover .cv-txt{font-size:2.2vmin;font-size:clamp(11px,2.2vmin,18px);color:#cfe0ff;letter-spacing:1px}
 #cover.cv-stand{background:rgba(0,0,0,.82)}
-#tunefx{position:absolute;inset:0;z-index:3;pointer-events:none;background:repeating-linear-gradient(0deg,#222 0 2px,#555 2px 3px,#111 3px 5px);animation:snow .12s steps(3) infinite;opacity:.9}
+#tunefx{position:absolute;top:0;right:0;bottom:0;left:0;z-index:3;pointer-events:none;background:repeating-linear-gradient(0deg,#222 0 2px,#555 2px 3px,#111 3px 5px);animation:snow .12s steps(3) infinite;opacity:.9}
 #bug[data-id="wwf"] img{filter:drop-shadow(0 0 2px rgba(0,0,0,.7))}
 /* the player never takes pointer or keyboard focus: every tap/click lands on our own layers above it */
 #ytwrap iframe,.ytp{pointer-events:none}
-#hls{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain;z-index:1} /* above the (stopped, opaque) YouTube player, under cover/snow/tap */
-#tap{position:absolute;inset:0;z-index:3;cursor:pointer}
+#hls{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;background:#000;object-fit:contain;z-index:1} /* above the (stopped, opaque) YouTube player, under cover/snow/tap */
+#tap{position:absolute;top:0;right:0;bottom:0;left:0;z-index:3;cursor:pointer}
 #unmute{position:absolute;z-index:4;right:12px;top:12px;background:rgba(0,0,0,.75);border:2px solid #ffcc00;color:#ffcc00;border-radius:8px;padding:8px 12px;font-weight:bold;font-size:14px}
-#snow{position:absolute;inset:0;z-index:2;background:repeating-linear-gradient(0deg,#222 0 2px,#444 2px 3px,#111 3px 5px);display:flex;align-items:center;justify-content:center;animation:snow .2s steps(3) infinite}
+#snow{position:absolute;top:0;right:0;bottom:0;left:0;z-index:2;background:repeating-linear-gradient(0deg,#222 0 2px,#444 2px 3px,#111 3px 5px);display:flex;align-items:center;justify-content:center;animation:snow .2s steps(3) infinite}
 @keyframes snow{0%{background-position:0 0}50%{background-position:0 3px}100%{background-position:0 1px}}
 .snowtxt{background:linear-gradient(#2a4aa8,#0d2370);border:3px solid #9fb6ff;padding:18px 28px;text-align:center;box-shadow:0 0 0 3px #000}
 .snowtxt b{display:block;font-size:20px}.snowtxt span{font-size:14px;color:#cfe0ff}
@@ -59,8 +59,8 @@ button{font-family:inherit;color:inherit}
 .rec.on,.fbtn.rec.on,#remote button.rec.on{background:linear-gradient(#ff4b4b,#b80000)!important;color:#fff!important;border-color:#fff}
 [data-r="cc"].on,[data-b="cc"].on,[data-v="cc"].on{background:linear-gradient(#ffe066,#e0a000)!important;color:#000!important}
 /* action dialog */
-#dlg{position:fixed;inset:0;z-index:85;background:rgba(0,0,12,.55);display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
-.dlg-box{width:min(92vw,520px);background:linear-gradient(#26449e,#0f2569 55%,#0a1b52);border:2px solid #8aa6f0;border-radius:10px;box-shadow:0 0 0 2px #000,0 10px 30px rgba(0,0,0,.7);padding:14px 16px}
+#dlg{position:fixed;top:0;right:0;bottom:0;left:0;z-index:85;background:rgba(0,0,12,.55);display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+.dlg-box{width:92vw;max-width:520px;width:min(92vw,520px);background:linear-gradient(#26449e,#0f2569 55%,#0a1b52);border:2px solid #8aa6f0;border-radius:10px;box-shadow:0 0 0 2px #000,0 10px 30px rgba(0,0,0,.7);padding:14px 16px}
 .dlg-t{font-weight:bold;font-size:17px;line-height:1.25}
 .dlg-s{color:#ffcc00;font-size:13px;font-weight:bold;margin:4px 0 10px}
 .dlg-b{display:flex;flex-direction:column;gap:7px}
@@ -70,7 +70,7 @@ button{font-family:inherit;color:inherit}
 .logo-cable.big{font-size:64px}
 /* brand: Comcast-2006-style wordmark (cable-logo-w.svg = white text + red crescent) */
 img.brand{display:block;height:1.6em;width:auto}
-img.brand.big{height:clamp(56px,14vmin,110px);margin:0 auto}
+img.brand.big{height:14vmin;height:clamp(56px,14vmin,110px);margin:0 auto}
 .g-brand img.brand{height:1.85em}
 
 /* buttons */
@@ -80,14 +80,14 @@ img.brand.big{height:clamp(56px,14vmin,110px);margin:0 auto}
 .fbtn:disabled{opacity:.5}
 
 /* power-on */
-#power{position:fixed;inset:0;z-index:90;background:radial-gradient(ellipse at center,#1d3c9c 0,#06164a 60%,#000 100%);display:flex;align-items:center;justify-content:center;text-align:center}
+#power{position:fixed;top:0;right:0;bottom:0;left:0;z-index:90;background:radial-gradient(ellipse at center,#1d3c9c 0,#06164a 60%,#000 100%);display:flex;align-items:center;justify-content:center;text-align:center}
 .pw-box{padding:20px;max-width:640px}
 .pw-sub{font-weight:bold;letter-spacing:8px;color:#cfe0ff;margin-top:4px;font-size:14px}
 .pw-load{margin-top:18px;color:#9fb6ff;font-size:13px}
 .pw-tips{margin-top:22px;color:#9fb6ff;font-size:12px;line-height:1.6}
 
 /* info banner */
-.banner{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:4.5vh;width:min(92vw,960px);display:flex;background:linear-gradient(#26449e,#0f2569 55%,#0a1b52);border:2px solid #8aa6f0;border-radius:10px;box-shadow:0 0 0 2px #000,0 8px 24px rgba(0,0,0,.6);overflow:hidden}
+.banner{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:4.5vh;width:92vw;max-width:960px;width:min(92vw,960px);display:flex;background:linear-gradient(#26449e,#0f2569 55%,#0a1b52);border:2px solid #8aa6f0;border-radius:10px;box-shadow:0 0 0 2px #000,0 8px 24px rgba(0,0,0,.6);overflow:hidden}
 .bn-ch{width:130px;flex:none;background:linear-gradient(#0a1b52,#06123a);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;border-right:2px solid #8aa6f0}
 .bn-num{font:bold 34px Verdana,sans-serif;color:#ffcc00;text-shadow:0 2px 0 #000}
 .bn-logo .lg{font-size:19px}
@@ -109,7 +109,7 @@ img.brand.big{height:clamp(56px,14vmin,110px);margin:0 auto}
 #toast{position:fixed;z-index:60;left:50%;top:5vh;transform:translateX(-50%);background:#0a1b52;border:2px solid #ffcc00;color:#fff;padding:8px 16px;border-radius:8px;font-weight:bold;font-size:14px;max-width:90vw}
 
 /* VOD bar */
-#vodbar{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:4vh;width:min(92vw,900px);background:linear-gradient(rgba(16,24,48,.92),rgba(0,0,0,.92));border:2px solid #8aa6f0;border-radius:10px;padding:10px 14px}
+#vodbar{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:4vh;width:92vw;max-width:900px;width:min(92vw,900px);background:linear-gradient(rgba(16,24,48,.92),rgba(0,0,0,.92));border:2px solid #8aa6f0;border-radius:10px;padding:10px 14px}
 .vb-title{font-weight:bold;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vb-row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:12px;color:#cfe0ff}
 .vb-prog{flex:1;height:10px;background:#06123a;border:1px solid #8aa6f0;border-radius:5px;overflow:hidden;cursor:pointer}
@@ -117,14 +117,14 @@ img.brand.big{height:clamp(56px,14vmin,110px);margin:0 auto}
 .vb-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
 /* full panels (guide / on demand) inside a 4:3 safe area */
-.panel{position:fixed;inset:0;z-index:20;background:linear-gradient(90deg,#000,#071447 12%,#071447 88%,#000)}
-.safe{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);height:100%;width:min(100vw,133.333vh);width:min(100vw,133.333dvh);display:flex;flex-direction:column;background:#0b1e57;font-size:clamp(11px,1.9vh,22px)}
+.panel{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20;background:linear-gradient(90deg,#000,#071447 12%,#071447 88%,#000)}
+.safe{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);height:100%;width:100vw;width:min(100vw,133.333vh);width:min(100vw,133.333dvh);display:flex;flex-direction:column;background:#0b1e57;font-size:1.9vh;font-size:clamp(11px,1.9vh,22px)}
 
 /* ---------- guide (i-Guide) ---------- */
 .g-top{display:flex;height:34%;min-height:150px;background:linear-gradient(#000,#05103a);border-bottom:3px solid #6f8fd8;contain:strict}
 .g-info>*{contain:layout paint}
 .g-prev{width:44%;flex:none;background:#000;border-right:3px solid #6f8fd8;position:relative}
-.g-prev::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 0 2px #000}
+.g-prev::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;box-shadow:inset 0 0 0 2px #000}
 .g-info{flex:1;padding:1.2% 2%;min-width:0;display:flex;flex-direction:column}
 .g-brand{display:flex;justify-content:space-between;align-items:center}
 .g-brand .logo-cable{font-size:1.6em}
@@ -221,7 +221,7 @@ img.brand.big{height:clamp(56px,14vmin,110px);margin:0 auto}
 @media (pointer:coarse){.kb{display:none}}
 @media (orientation:portrait) and (max-width:820px){
   :root{--vt:calc(env(safe-area-inset-top,0px) + 100vw * 9 / 16)}
-  .safe{width:100vw;top:var(--vt);height:auto;bottom:0;font-size:clamp(12.5px,2.15vw,16px);padding:0 env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+  .safe{width:100vw;top:var(--vt);height:auto;bottom:0;font-size:2.15vw;font-size:clamp(12.5px,2.15vw,16px);padding:0 env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
   .panel{background:#0b1e57}
   .g-top{height:auto;min-height:0;contain:layout paint}
   .g-prev{display:none}
@@ -262,7 +262,7 @@ img.brand.big{height:clamp(56px,14vmin,110px);margin:0 auto}
 }
 /* compact landscape (Duo outer 594x368, Duo inner 951x585, phones on their side): no 4:3 pillarbox; guide = preview + info | grid */
 @media (orientation:landscape) and (max-height:640px) and (max-width:1100px){
-  .safe{width:100%;left:0;transform:none;font-size:clamp(11px,2.35vh,15px);font-size:clamp(11px,2.35dvh,15px);padding:0 env(safe-area-inset-right,0) 0 env(safe-area-inset-left,0)}
+  .safe{width:100%;left:0;transform:none;font-size:2.35vh;font-size:clamp(11px,2.35vh,15px);font-size:clamp(11px,2.35dvh,15px);padding:0 env(safe-area-inset-right,0) 0 env(safe-area-inset-left,0)}
   .panel{background:#0b1e57}
   #guide .safe{display:grid;grid-template-columns:38% minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto}
   .g-top{grid-column:1;grid-row:1/5;flex-direction:column;height:auto;min-height:0;border-bottom:0;border-right:3px solid #6f8fd8}
@@ -274,7 +274,7 @@ img.brand.big{height:clamp(56px,14vmin,110px);margin:0 auto}
   .g-foot .fbtn{font-size:.78em;padding:.3em .6em}
   .od-head{padding:.4em 1em}.od-body{padding:.6em 1em;gap:1em}.od-list{width:56%}
   .od-foot>span:first-child{display:none}.od-foot{padding:.4em 1em}
-  .banner{bottom:calc(env(safe-area-inset-bottom,0px) + 8px);width:min(94vw,900px)}
+  .banner{bottom:calc(env(safe-area-inset-bottom,0px) + 8px);width:94vw;max-width:900px;width:min(94vw,900px)}
   .bn-ch{width:100px}.bn-num{font-size:26px}.bn-title{font-size:17px}.bn-main{padding:8px 12px}
   #remote{top:calc(env(safe-area-inset-top,0px) + 8px);bottom:auto;gap:4px;padding:4px;max-width:calc(100vw - env(safe-area-inset-right,0px) - env(safe-area-inset-left,0px) - 16px)}
   #remote button{font-size:11px;padding:7px 8px;min-width:0}
@@ -294,3 +294,7 @@ html.tv .fbtn.focus{background:linear-gradient(#ffe066,#ffb400 60%,#e08a00);colo
 
 /* DONATE (2026-11-19): power-on screen + ON DEMAND footer; button styles come from donate.js */
 .pw-donate{margin-top:14px}.od-fbtns .hkd-btn{font-size:11px;min-height:0;padding:.3em .9em;border-width:1px;align-self:center}
+
+/* TV remotes: D-pad menu bar (OK opens it) - 2026-11-20 */
+html.tv #remote button.focus{background:linear-gradient(#ffe066,#ffb400 60%,#e08a00);color:#000;border-color:#fff;outline:3px solid #fff;outline-offset:1px}
+html.tv .bn-act:after{content:"OK = MENU";display:block;font-size:10px;font-weight:bold;color:#cfe0ff;text-align:center;margin-top:4px}

@@ -28,7 +28,7 @@
     ".hkd-btn.hkd-sm{min-height:30px;padding:4px 11px}.hkd-btn.hkd-sm .hkd-s{display:none}" +
     ".hkd-btn.hkd-lg{min-height:50px;padding:7px 22px;font-size:17px}.hkd-btn.hkd-lg .hkd-s{font-size:11.5px}.hkd-btn.hkd-lg .hkd-ic{width:20px;height:20px;font-size:15px}" +
     "html.tv a.hkd-btn[target],html.tv .hkd-btn{display:inline-flex!important}" +
-    ".hkd-m{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.78);padding:16px;box-sizing:border-box;" +
+    ".hkd-m{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.78);padding:16px;box-sizing:border-box;" +
     "font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif}" +
     ".hkd-m[hidden]{display:none!important}" +
     ".hkd-box{background:#fff;color:#111;border-radius:20px;padding:22px 26px 20px;max-width:min(92vw,560px);max-height:94vh;overflow:auto;box-sizing:border-box;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}" +
