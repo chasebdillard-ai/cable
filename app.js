@@ -1072,7 +1072,7 @@
   var num = "", numT = null;
   function numKey(dg) {
     num = (num + dg).slice(-3); var e = $("#numentry"); e.textContent = num + "-"; e.hidden = false;
-    clearTimeout(numT); numT = setTimeout(function () { var n = +num; num = ""; e.hidden = true; var c = CH.filter(function (c) { return c.n === n; })[0]; if (c) { if (S.mode !== "tv") setMode("tv"); tune(c.idx); } else toast("Channel " + n + " is not available"); }, 1600);
+    clearTimeout(numT); numT = setTimeout(function () { var n = /^0\d$/.test(num) ? +("0." + num.charAt(1)) : +num; /* 01-08 or 0.1-0.8 = live feeds (2026-11-19) */ num = ""; e.hidden = true; var c = CH.filter(function (c) { return c.n === n; })[0]; if (c) { if (S.mode !== "tv") setMode("tv"); tune(c.idx); } else toast("Channel " + n + " is not available"); }, 1600);
   }
   function key(k) {
     if (!S.started) {   // power-on screen: OK = watch TV; Down/Right moves to DONATE, Up/Left back to the OK button (2026-11-19)
@@ -1113,7 +1113,7 @@
     MediaFastForward: "ff", MediaRewind: "rw", FastFwd: "ff", Rewind: "rw", ColorF0Red: "rec", ColorF1Green: "cc", ColorF2Yellow: "dvr", ColorF3Blue: "od", DVR: "dvr", MediaLast: "last", MediaPlay: "pp", MediaPause: "pp" };
   d.addEventListener("keydown", function (e) {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName) && !/Escape|ArrowUp|ArrowDown/.test(e.key)) return;
-    if (/^[0-9]$/.test(e.key) && S.started && S.mode !== "od") { e.preventDefault(); return numKey(e.key); }
+    if (/^[0-9.]$/.test(e.key) && S.started && S.mode !== "od") { e.preventDefault(); return numKey(e.key); }
     var k = KEYMAP[e.key] || (e.keyCode === 4 || e.keyCode === 461 || e.keyCode === 10009 ? "back" : e.keyCode === 427 ? "chup" : e.keyCode === 428 ? "chdn" : e.keyCode === 457 ? "info" : e.keyCode === 416 ? "rec" : e.keyCode === 460 ? "cc" : e.keyCode === 403 ? "rec" : e.keyCode === 404 ? "cc" : e.keyCode === 405 ? "dvr" : e.keyCode === 406 ? "od" : e.keyCode === 417 ? "ff" : e.keyCode === 412 ? "rw" : e.keyCode === 415 || e.keyCode === 19 ? "pp" : null);
     if (!k) return;
     // FF / RW: +/-30 s in ON DEMAND playback, otherwise channel up/down (guide/menus: page) - for remotes with no CH buttons (Fire TV, Google TV)

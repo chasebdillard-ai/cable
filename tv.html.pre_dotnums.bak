@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="gate.js?v=0"></script>
+<script src="donate.js?v=0"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06164a">
+<title>Get the App · Watch Cable on TV</title>
+<meta name="description" content="Cable on Fire TV, Google TV, Android TV, Roku, Android phones and tablets, iPhone, iPad and smart TV browsers. Fire TV / Google TV Downloader code 4793854.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#dfe4ec;font:13px/1.5 Verdana,Tahoma,Geneva,sans-serif;color:#222}
+a{color:#0b4aa8}
+.wrap{max-width:980px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 0 1px #b9c3d3,0 0 24px rgba(0,0,0,.12)}
+.top{background:linear-gradient(#fff,#eef1f6);border-bottom:1px solid #c5ccd8;display:flex;align-items:center;justify-content:space-between;padding:14px 22px}
+.top img{height:46px}
+.top .r{font-size:11px;color:#666;text-align:right}
+.nav{background:linear-gradient(#2a64c4,#0e3a8c);border-top:1px solid #5d8ee0;border-bottom:3px solid #E31937;display:flex;flex-wrap:wrap;padding:0 12px}
+.nav a{color:#fff;text-decoration:none;font-weight:bold;font-size:12px;padding:9px 12px;border-right:1px solid rgba(255,255,255,.18)}
+.nav a:hover,.nav a:focus,.nav a.f{background:#ffcc00;color:#06164a;outline:none}
+.hero{display:flex;gap:22px;align-items:center;padding:22px;background:linear-gradient(135deg,#06164a,#1d3c9c);color:#fff;flex-wrap:wrap}
+.hero h1{margin:0 0 6px;font-size:24px;font-weight:normal;letter-spacing:-.5px}
+.hero h1 b{color:#ffcc00}
+.hero p{margin:0;color:#cfe0ff;max-width:520px}
+.codebox{margin-left:auto;background:#fff;color:#06164a;border-radius:10px;border:3px solid #ffcc00;padding:12px 20px;text-align:center;min-width:250px}
+.codebox small{display:block;font-size:11px;color:#555;text-transform:uppercase;letter-spacing:1px}
+.codebox .code{font:bold 40px/1.1 Verdana,sans-serif;letter-spacing:4px;color:#E31937}
+.codebox .alt{font-size:11px;color:#444}
+.main{padding:18px 22px 30px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:18px}
+.tile{display:block;text-decoration:none;color:#06164a;border:1px solid #b9c3d3;border-radius:8px;background:linear-gradient(#fff,#e9eef6);padding:10px 12px;font-weight:bold}
+.tile span{display:block;font-weight:normal;color:#555;font-size:11px}
+.tile:hover,.tile:focus,.tile.f{background:linear-gradient(#ffe680,#ffcc00);border-color:#d4a400;outline:none}
+.box{border:1px solid #b9c3d3;border-radius:8px;margin:0 0 16px;overflow:hidden}
+.box h2{margin:0;font-size:15px;color:#fff;background:linear-gradient(#3d72cc,#1a4596);padding:7px 12px;border-bottom:2px solid #E31937}
+.box h2 small{font-weight:normal;color:#cfe0ff;font-size:11px;margin-left:8px}
+.box .in{padding:10px 14px}
+.box ol,.box ul{margin:6px 0;padding-left:22px}
+.box li{margin:3px 0}
+.pill{display:inline-block;background:#E31937;color:#fff;border-radius:12px;padding:1px 10px;font-weight:bold;font-size:12px}
+.ok{color:#137a1d;font-weight:bold}.no{color:#b3121f;font-weight:bold}
+.btn{display:inline-block;background:linear-gradient(#ffdf5c,#f5b800);border:1px solid #c79500;border-radius:14px;color:#06164a;font-weight:bold;text-decoration:none;padding:5px 16px;margin:4px 6px 4px 0}
+.btn:hover,.btn:focus,.btn.f{background:linear-gradient(#2a64c4,#0e3a8c);color:#fff;outline:none}
+code{background:#eef1f6;border:1px solid #d3d9e3;border-radius:4px;padding:0 5px;font-size:12px;word-break:break-all}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{border:1px solid #c5ccd8;padding:5px 8px;text-align:left;vertical-align:top}
+th{background:#eef1f6;color:#06164a}
+.note{font-size:11px;color:#666}
+.foot{border-top:1px solid #c5ccd8;padding:12px 22px;font-size:11px;color:#666;background:#f4f6fa}
+@media (max-width:640px){.hero h1{font-size:20px}.codebox{margin-left:0;width:100%}.nav a{padding:8px 9px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a href="./" title="Back to Cable"><img src="cable-logo.svg" alt="cable"></a><div class="r"><b>DIGITAL CABLE</b><br>Get the App &middot; Watch on TV</div></div>
+  <div class="nav" id="nav">
+    <a href="./">&#9664; Watch TV</a><a href="#firetv">Fire TV</a><a href="#googletv">Google TV / Android TV</a><a href="#android">Android Phone &amp; Tablet</a><a href="#ios">iPhone &amp; iPad</a><a href="#roku">Roku</a><a href="#smarttv">Smart TV Browsers</a><a href="#cast">Apple TV &amp; Casting</a><a href="#remote">Remote Buttons</a>
+  </div>
+  <div class="hero">
+    <div><h1>Get <b>Cable</b> on every screen in the house</h1><p>46 live channels, the program guide, ON DEMAND and My DVR &mdash; free, on your TV, phone and tablet. Same channels, same guide, everywhere.</p></div>
+    <div class="codebox"><small>Fire TV &amp; Google TV &middot; Downloader code</small><div class="code">4793854</div><div class="alt">or type <b>aftv.news/4793854</b></div></div>
+  </div>
+  <div class="main">
+    <div class="grid">
+      <a class="tile" href="#firetv">Amazon Fire TV<span>Fire TV Stick, Cube, Fire TV Edition TVs</span></a>
+      <a class="tile" href="#googletv">Google TV / Android TV<span>Chromecast with Google TV, Google TV Streamer, Sony, TCL, Hisense, Shield</span></a>
+      <a class="tile" href="#android">Android phone &amp; tablet<span>Install the app or add to Home screen</span></a>
+      <a class="tile" href="#ios">iPhone &amp; iPad<span>Add to Home Screen from Safari</span></a>
+      <a class="tile" href="#roku">Roku<span>Live channels play on Roku</span></a>
+      <a class="tile" href="#smarttv">Samsung &amp; LG TVs<span>Built-in web browser</span></a>
+      <a class="tile" href="#cast">Apple TV &amp; casting<span>AirPlay, Chromecast, screen mirroring</span></a>
+      <a class="tile" href="#remote">Remote buttons<span>Guide, Info, Record, CC, My DVR</span></a>
+    </div>
+
+    <div class="box" id="firetv"><h2>Amazon Fire TV <small>App &middot; Downloader code 4793854</small></h2><div class="in">
+      <ol>
+        <li>On the Fire TV home screen, search for <b>Downloader</b> (orange icon, by AFTVnews) and install it.</li>
+        <li>Go to <b>Settings &rarr; My Fire TV &rarr; Developer Options &rarr; Install unknown apps</b> and turn <b>Downloader</b> ON.
+          <span class="note">(No Developer Options? Settings &rarr; My Fire TV &rarr; About &rarr; click your device name 7 times.)</span></li>
+        <li>Open Downloader, type <span class="pill">4793854</span> in the box and press <b>Go</b>.</li>
+        <li>Press <b>Install</b>, then <b>Open</b>. Cable shows up in Your Apps &amp; Channels &mdash; move it to the front row if you like.</li>
+      </ol>
+      <p>Cable powers on to your last channel with sound. The screen stays awake while you watch. Use the remote as listed under <a href="#remote">Remote buttons</a>: <b>Menu (&#9776;)</b> opens the Guide, <b>&#9654;&#9654; / &#9664;&#9664;</b> change channels.</p>
+      <p class="note">Direct link (if you'd rather not use the code): <code>https://chasebdillard-ai.github.io/tv-apps/cable.apk</code></p>
+    </div></div>
+
+    <div class="box" id="googletv"><h2>Google TV / Android TV <small>Same app &middot; code 4793854</small></h2><div class="in">
+      <p>Works on <b>Chromecast with Google TV</b>, <b>Google TV Streamer</b>, Sony / TCL / Hisense / Philips Google TV and Android TV sets, and NVIDIA Shield.</p>
+      <ol>
+        <li>Install <b>Downloader by AFTVnews</b> from the Google Play Store on the TV.</li>
+        <li>Turn on developer mode: <b>Settings &rarr; System &rarr; About</b>, click <b>Android TV OS build</b> 7 times.</li>
+        <li>Allow installs: <b>Settings &rarr; Apps &rarr; Security &amp; restrictions &rarr; Unknown sources &rarr; Downloader</b> ON.</li>
+        <li>Open Downloader, enter <span class="pill">4793854</span>, press <b>Go</b>, then <b>Install</b>.</li>
+      </ol>
+      <p>Cable appears in the Apps row with its own TV banner. On the Google TV remote: <b>OK</b> = Info, <b>&#9650;&#9660;</b> = channels, <b>Back</b> closes menus (press twice on live TV to leave the app).</p>
+    </div></div>
+
+    <div class="box" id="android"><h2>Android phones &amp; tablets <small>App or Home-screen shortcut</small></h2><div class="in">
+      <p><b>Option A &mdash; the app</b> (same file as the TV app; it turns itself into the phone layout):</p>
+      <ol>
+        <li>On the phone, open <a class="btn" href="https://chasebdillard-ai.github.io/tv-apps/cable.apk">Download Cable for Android</a> and tap the download when it finishes.</li>
+        <li>If asked, allow your browser to <b>install unknown apps</b>, then tap <b>Install</b>.</li>
+      </ol>
+      <p><b>Option B &mdash; no install:</b> open <code>chasebdillard-ai.github.io/cable</code> in <b>Chrome</b>, tap <b>&#8942; &rarr; Install app</b> (or <b>Add to Home screen</b>). Cable opens full screen with its own icon, like an app. Samsung Internet: <b>&#9776; &rarr; Add page to &rarr; Home screen</b>.</p>
+      <p class="note">Works on foldables and dual-screen phones too (Surface Duo, Galaxy Fold): portrait puts the TV on top with the guide below; rotate for full-width TV.</p>
+    </div></div>
+
+    <div class="box" id="ios"><h2>iPhone &amp; iPad <small>Add to Home Screen</small></h2><div class="in">
+      <ol>
+        <li>Open <code>chasebdillard-ai.github.io/cable</code> in <b>Safari</b>.</li>
+        <li>Tap <b>Share</b> (&#8679;) &rarr; <b>Add to Home Screen</b> &rarr; <b>Add</b>.</li>
+        <li>Open <b>Cable</b> from the Home Screen: it runs full screen with no Safari bars and the Cable icon. Tap <b>Press OK to watch TV</b> once to turn the sound on (Apple requires one tap).</li>
+      </ol>
+      <p class="note">There is no App Store version. To get Cable onto the big screen from an iPhone or iPad, see <a href="#cast">AirPlay</a>.</p>
+    </div></div>
+
+    <div class="box" id="roku"><h2>Roku <small>Live channels play on Roku</small></h2><div class="in">
+      <p>Roku can't run web pages, so the Roku version is a separate Roku channel:</p>
+      <ul>
+        <li><span class="ok">Plays right on the Roku:</span> the live networks <b>70 Right Now TV</b>, <b>72 COMET</b>, <b>74 Charge!</b>, <b>76 Fubo Sports Network</b>, <b>78 Bally Sports Live</b>, <b>80 ION</b>, <b>82 ION Plus</b> and <b>84 Yahoo Sports Network</b> (&#9650;&#9660; flips between them).</li>
+        <li><span class="ok">Shows what's On Now / Up Next</span> for every other channel, on the same schedule as the website.</li>
+        <li><span class="no">Can't play inside the Roku channel:</span> channels and ON DEMAND programs that come from YouTube. Choosing one opens it in Roku's own <b>YouTube</b> channel, from the beginning (not in sync with the schedule). That needs the YouTube channel installed and <b>Settings &rarr; System &rarr; Advanced system settings &rarr; Control by mobile apps &rarr; Network access</b> set to <b>Default</b> or <b>Permissive</b>.</li>
+      </ul>
+      <p><b>Install (developer side-load, for your own Roku):</b></p>
+      <ol>
+        <li>On the Roku remote press <b>Home &times;3, Up &times;2, Right, Left, Right, Left, Right</b>. Turn on the developer installer and set a password; note the Roku's IP address shown.</li>
+        <li>On a computer on the same Wi-Fi, download <a class="btn" href="roku-app/cable-roku.zip">cable-roku.zip</a>.</li>
+        <li>Open <code>http://&lt;Roku IP address&gt;</code> in a browser, sign in as <b>rokudev</b> with your password, choose <b>Upload</b> &rarr; cable-roku.zip &rarr; <b>Install with zip</b>.</li>
+      </ol>
+      <p class="note">Easier for everything else on Roku: cast or mirror the website from a phone or computer (Roku supports AirPlay on most 4K models and screen mirroring from Android/Windows).</p>
+    </div></div>
+
+    <div class="box" id="smarttv"><h2>Samsung, LG and other smart TV browsers <small>No install</small></h2><div class="in">
+      <ol>
+        <li>Open the TV's <b>Internet</b> / <b>Web Browser</b> app (Samsung: <i>Internet</i>; LG: <i>Web Browser</i>).</li>
+        <li>Type <span class="pill">aftv.news/9792225</span> (forwards to Cable in TV mode), or <code>chasebdillard-ai.github.io/cable/?tv=1</code>.</li>
+        <li>Press <b>OK</b> on <b>Press OK to watch TV</b>. Bookmark the page for next time.</li>
+      </ol>
+      <p>The TV remote works: arrows, <b>OK</b>, <b>CH +/&minus;</b>, number keys, <b>Back</b>, and the color buttons <span style="color:#d00">&#9632;</span>&nbsp;Record, <span style="color:#090">&#9632;</span>&nbsp;Captions, <span style="color:#cc0">&#9632;</span>&nbsp;My DVR, <span style="color:#00c">&#9632;</span>&nbsp;ON DEMAND.</p>
+      <p class="note">Built-in TV browsers are slower than the apps and some older models can't play the YouTube-based channels; on those, use a Fire TV / Google TV stick or casting.</p>
+    </div></div>
+
+    <div class="box" id="cast"><h2>Apple TV, AirPlay &amp; Chromecast <small>Put a phone or computer on the TV</small></h2><div class="in">
+      <ul>
+        <li><b>Apple TV</b> has no web browser and Cable isn't in the App Store, so there's no Apple TV app. From an <b>iPhone or iPad</b>: open Control Center &rarr; <b>Screen Mirroring</b> &rarr; your Apple TV (or an AirPlay&nbsp;2 TV &mdash; Samsung, LG, Vizio, Roku). From a <b>Mac</b>: Control Center &rarr; Screen Mirroring.</li>
+        <li><b>Chromecast with Google TV / Google TV Streamer</b>: install the app (see <a href="#googletv">Google TV</a>) &mdash; best option.</li>
+        <li><b>Older Chromecast</b> (no remote): in <b>Chrome</b> on a computer, &#8942; &rarr; <b>Cast&hellip;</b> &rarr; <b>Cast tab</b>; from Android, Quick Settings &rarr; <b>Cast / Screen cast</b>.</li>
+        <li><b>Xbox</b>: the <b>Microsoft Edge</b> app opens the website like a smart TV browser.</li>
+      </ul>
+      <p class="note">Mirroring sends the whole phone screen, so keep the phone awake and on the Cable page.</p>
+    </div></div>
+
+    <div class="box" id="remote"><h2>Remote buttons</h2><div class="in">
+      <table>
+        <tr><th>To do this</th><th>Fire TV / Google TV app</th><th>Smart TV browser / keyboard</th></tr>
+        <tr><td>Change channel</td><td>&#9650; &#9660;, CH +/&minus; (if your remote has them), &#9654;&#9654; / &#9664;&#9664;</td><td>&#9650; &#9660;, CH +/&minus;, Page Up/Down, + / &minus;</td></tr>
+        <tr><td>Tune a channel number</td><td>Number keys (TV remotes with a keypad)</td><td>Number keys</td></tr>
+        <tr><td>Program Guide</td><td><b>Menu &#9776;</b> or Guide</td><td>G, Guide</td></tr>
+        <tr><td>Info banner</td><td>OK, &#9664; &#9654;, Info</td><td>OK / Enter, I</td></tr>
+        <tr><td>ON DEMAND</td><td>Blue button</td><td>D, Blue</td></tr>
+        <tr><td>Record (My DVR)</td><td>Record, Red</td><td>R, Red</td></tr>
+        <tr><td>My DVR list</td><td>DVR, Yellow</td><td>V, Yellow</td></tr>
+        <tr><td>Captions on/off (off by default)</td><td>CC, Green</td><td>C, Green</td></tr>
+        <tr><td>Last channel</td><td>Last (if your remote has it)</td><td>L</td></tr>
+        <tr><td>ON DEMAND playback</td><td>&#9654;&#10074;&#10074; Play/Pause, &#9654;&#9654; +30 s, &#9664;&#9664; &minus;30 s</td><td>Play/Pause, FF, RW</td></tr>
+        <tr><td>Close / go back</td><td>Back (twice on live TV to exit)</td><td>Back / Esc</td></tr>
+      </table>
+      <p class="note">The basic Fire TV and Google TV remotes have no number, color or CC buttons: use the on-screen Guide, the ON DEMAND menu and the info banner's CC / Rec buttons instead.</p>
+    </div></div>
+    <p><a class="btn" href="./">&#9664; Back to Cable</a></p>
+  </div>
+  <div class="foot">Cable &middot; free channels from official sources. Apps: Android 5.1+ (Fire OS 5+, Android TV / Google TV). The Android app is installed outside the app stores, so it doesn't update itself: get updates with the same code.</div>
+</div>
+<script>
+/* Remote / arrow-key navigation for TV browsers and the Cable app (which sends arrow / Enter / Escape key events). */
+(function () {
+  var d = document, cur = null;
+  function items() { return Array.prototype.filter.call(d.querySelectorAll('a[href]'), function (a) { var r = a.getBoundingClientRect(); return r.width > 0 && r.height > 0; }); }
+  function setF(a) { if (cur) cur.classList.remove('f'); cur = a; if (!a) return; a.classList.add('f'); try { a.focus({ preventScroll: true }); } catch (e) { a.focus(); } var r = a.getBoundingClientRect(); if (r.top < 60 || r.bottom > innerHeight - 40) a.scrollIntoView({ block: 'center' }); }
+  function move(dir) {
+    var l = items(); if (!cur || l.indexOf(cur) < 0) return setF(l[0]);
+    var a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2, best = null, bs = 1e9;
+    l.forEach(function (e) { if (e === cur) return; var b = e.getBoundingClientRect(), bx = b.left + b.width / 2, by = b.top + b.height / 2, dx = bx - ax, dy = by - ay, p, s;
+      if (dir === 'r') { if (dx <= 2 || Math.abs(dy) > a.height) return; p = dx; s = Math.abs(dy); }
+      else if (dir === 'l') { if (dx >= -2 || Math.abs(dy) > a.height) return; p = -dx; s = Math.abs(dy); }
+      else if (dir === 'd') { if (dy <= 4) return; p = dy; s = Math.abs(dx); }
+      else { if (dy >= -4) return; p = -dy; s = Math.abs(dx); }
+      var sc = p + s * 2; if (sc < bs) { bs = sc; best = e; } });
+    if (best) setF(best); else window.scrollBy(0, dir === 'd' ? 200 : dir === 'u' ? -200 : 0);
+  }
+  d.addEventListener('keydown', function (e) {
+    var k = e.key, c = e.keyCode;
+    var m = { ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r' }[k] || { 38: 'u', 40: 'd', 37: 'l', 39: 'r' }[c];
+    if (m) { e.preventDefault(); return move(m); }
+    if ((k === 'Enter' || c === 13) && cur) { e.preventDefault(); cur.click(); return; }
+    if (k === 'Escape' || k === 'Backspace' || k === 'BrowserBack' || k === 'GoBack' || c === 461 || c === 10009) { e.preventDefault(); location.href = './'; }
+  });
+  d.addEventListener('click', function (e) { var a = e.target.closest && e.target.closest('a[href^="#"]'); if (a) { var t = d.getElementById(a.getAttribute('href').slice(1)); if (t) { e.preventDefault(); t.scrollIntoView({ block: 'start' }); var f = t.querySelector('a[href]'); if (f && /TV|AFT|CableApp|Tizen|Web0S|webOS/i.test(navigator.userAgent)) setF(f); } } });
+})();
+</script>
+</body>
+</html>
