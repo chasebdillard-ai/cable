@@ -1177,7 +1177,7 @@
   // ---------- boot ----------
   loadYT();
   var qv = (d.querySelector('script[src^="app.js"]') || {}).src || ""; qv = (qv.split("?")[1] || "");
-  Promise.all([fetch("catalog.json" + (location.search.indexOf("nocache") >= 0 ? "?" + Date.now() : "")).then(function (r) { return r.json(); }), fetch("live.json?" + Math.floor(Date.now() / 3600000)).then(function (r) { return r.json(); })]).then(function (a) {
+  Promise.all([fetch(((d.querySelector('meta[name="cable-cat"]') || {}).content || "catalog.json").replace(/\?v=0$/, "") + (location.search.indexOf("nocache") >= 0 ? (/\?/.test(((d.querySelector('meta[name="cable-cat"]') || {}).content || "").replace(/\?v=0$/, "")) ? "&" : "?") + Date.now() : "")).then(function (r) { return r.json(); }), fetch(/v=[0-9a-f]{8}$/.test((d.querySelector('meta[name="cable-live"]') || {}).content || "") ? d.querySelector('meta[name="cable-live"]').content : "live.json?" + Math.floor(Date.now() / 3600000)).then(function (r) { return r.json(); })]).then(function (a) {
     CAT = a[0]; LIVE = a[1]; prep();
     $(".pw-load").textContent = CH.length + " channels \u00b7 " + VV.length.toLocaleString() + " free programs ON DEMAND";
     var b = $("#pwbtn"); b.disabled = false; if (IS_TV) b.classList.add("focus"); try { b.focus(); } catch (e) {}
