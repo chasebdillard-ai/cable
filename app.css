@@ -288,3 +288,6 @@ html.tv .fbtn:hover{background:linear-gradient(#4f6fcf,#203f9a 60%,#16307c);colo
 html.tv .fbtn.focus{background:linear-gradient(#ffe066,#ffb400 60%,#e08a00);color:#000}
 
 .pw-app{display:inline-block;margin-top:16px;color:#ffcc00;font-size:13px;font-weight:bold;text-decoration:none;border:1px solid #ffcc00;border-radius:14px;padding:4px 14px}.pw-app:hover,.pw-app:focus{background:#ffcc00;color:#06164a}html.app .pw-app{display:none}
+
+/* during a YouTube ad the player takes taps so its own Skip button works (2026-11-19) */
+#screen.adon #tap{pointer-events:none}#screen.adon #ytwrap.ad .ytp.on,#screen.adon #ytwrap.ad iframe{pointer-events:auto}

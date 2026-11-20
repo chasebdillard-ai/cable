@@ -153,7 +153,7 @@
     try { PL[old].mute(); PL[old].stopVideo(); } catch (e) {}
   }
   function live(j, isAd) {
-    cut(j.n); $("#ytwrap").classList.toggle("ad", !!isAd); cover(null); S.picOK = true; S.skips = 0; S.tmo = 0;
+    cut(j.n); $("#ytwrap").classList.toggle("ad", !!isAd); $("#screen").classList.toggle("adon", !!isAd); cover(null); S.picOK = true; S.skips = 0; S.tmo = 0;
     sound();
     if (isAd) return;
     j.ok = j.done = true; j.okAt = Date.now(); LOG.push(["playing", j.id, j.okAt - j.t0, j.okAt]);
@@ -172,9 +172,10 @@
     } else needSound();
   }
   function needSound() { var u = $("#unmute"); u.textContent = IS_TV ? "Press OK for sound" : "Tap for sound"; u.hidden = false; }
-  function fail(j, why) {
+  function fail(j, why, sessionOnly) {
     j.done = true;
-    if (why === "no-picture") { // could be the video, could be the connection: only remember it for this session, and after
+    if (sessionOnly) { S.bad[j.id] = 1; LOG.push(["bad", j.id, why, Date.now()]); }
+    else if (why === "no-picture") { // could be the video, could be the connection: only remember it for this session, and after
       S.bad[j.id] = 1; LOG.push(["bad", j.id, why, Date.now()]); // 3 timeouts in a row assume a weak connection and retry instead of skipping
       if ((S.tmo = (S.tmo || 0) + 1) >= 3) { S.tmo = 0; delete S.bad[j.id]; cover("stand", "Weak signal – please stand by"); clearTimeout(fail.rt); fail.rt = setTimeout(function () { if (!S.vod && CH[S.ch] && !CH[S.ch].hls) { S.override = null; tune(S.ch, { quiet: true, keepLast: true }); } }, 8000); return; }
     } else markBad(j.id, why);
@@ -195,13 +196,26 @@
       if (S.mode === "vod" || S.vod) return vodNext();
       S.override = null; S.picOK = false; tune(S.ch, { quiet: true, keepLast: true });
     }
-    if (e.data === 1) { $("#ytwrap").classList.remove("ad"); cover(null); }
+    if (e.data === 1) { $("#ytwrap").classList.remove("ad"); $("#screen").classList.remove("adon"); cover(null); }
   }
+  // Only 100/101/150/153 (removed, private, embedding disabled / blocked) mean the video itself is bad and get remembered.
+  // 5 (HTML5 player error) and 2 are usually transient (ad hand-off, autoplay race): retry the same program at its schedule offset first.
+  var HARD = { 100: 1, 101: 1, 150: 1, 153: 1 };
   function onYTError(n, e) {
     LOG.push(["error", e.data, Date.now(), n]);
+    if (!HARD[e.data]) {
+      var jj = job && !job.done && job.n === n ? job : null, id = jj ? jj.id : S.playing, key = id + ":" + (S.vod ? "v" : S.ch);
+      S.soft = S.soft || {}; S.soft[key] = (S.soft[key] || 0) + 1;
+      if (S.soft[key] <= 2 && (jj || n === act)) {
+        var off = jj ? jj.start + (Date.now() - jj.t0) / 1000 : (function () { try { return PL[n].getCurrentTime() || 0; } catch (x) { return 0; } })();
+        LOG.push(["retry", id, e.data, Date.now()]); var o = jj ? jj.o : { keep: true, vod: !!S.vod };
+        setTimeout(function () { if (S.playing === id || (S.vod && S.vod.id === id)) ytLoad(id, off + 1.5, o); }, 1500); if (jj) jj.done = true; return;
+      }
+      if (jj) { jj.done = true; S.bad[id] = 1; return fail(jj, "soft " + e.data, true); }
+    }
     if (job && !job.done && job.n === n) return fail(job, "error " + e.data);
     if (n !== act) return;
-    markBad(S.playing, "error " + e.data);
+    if (HARD[e.data]) markBad(S.playing, "error " + e.data); else S.bad[S.playing] = 1;
     if (S.vod) { toast("This program is unavailable - skipping"); return vodNext(); }
     S.override = null; S.picOK = false; tune(S.ch, { quiet: true, keepLast: true });
   }
