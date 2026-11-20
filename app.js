@@ -1013,7 +1013,8 @@
       { label: "My DVR / Recordings", ic: '<i class="rd"></i>', go: openDVR, info: "<h3>My DVR</h3><p>Your recordings, scheduled recordings and series recordings. Recorded programs play from the start, any time.</p>" },
       { label: "My Favorites", ic: "&#9733;", screen: favScreen },
       { label: s && s.user ? "My Account" : "Sign In / Create Account", ic: "&#9679;", screen: accountScreen },
-      { label: "Get the App / Watch on TV", ic: "&#9632;", go: function () { location.href = "tv.html"; }, info: "<h3>Get the App</h3><p>Cable on Fire TV, Google TV, Android TV, phones, tablets, iPhone and iPad. Fire TV / Google TV: Downloader code <b>4793854</b>.</p>" }
+      { label: "Get the App / Watch on TV", ic: "&#9632;", go: function () { location.href = "tv.html"; }, info: "<h3>Get the App</h3><p>Cable on Fire TV, Google TV, Android TV, phones, tablets, iPhone and iPad. Fire TV / Google TV: Downloader code <b>4793854</b>.</p>" },
+      { label: "DONATE \u00b7 Support us on Cash App", ic: "$", go: function () { if (W.HKDonate) W.HKDonate.go(); else W.open("https://cash.app/$WrestleWorldPlus", "_blank", "noopener"); }, info: "<h3>DONATE</h3><p>Support us on Cash App: <b>$WrestleWorldPlus</b> (cash.app/$WrestleWorldPlus).</p><p>" + (IS_TV ? "Press OK for a QR code to scan with your phone." : "Opens Cash App in a new tab.") + "</p>" }
     ];
     return { title: "Main Menu", items: it };
   }
@@ -1074,7 +1075,13 @@
     clearTimeout(numT); numT = setTimeout(function () { var n = +num; num = ""; e.hidden = true; var c = CH.filter(function (c) { return c.n === n; })[0]; if (c) { if (S.mode !== "tv") setMode("tv"); tune(c.idx); } else toast("Channel " + n + " is not available"); }, 1600);
   }
   function key(k) {
-    if (!S.started) { if (k === "ok") powerOn(); return; }
+    if (!S.started) {   // power-on screen: OK = watch TV; Down/Right moves to DONATE, Up/Left back to the OK button (2026-11-19)
+      var pd = $("#pwdonate"), pb = $("#pwbtn");
+      if (pd && (k === "down" || k === "right")) { pd.classList.add("focus"); pb.classList.remove("focus"); try { pd.focus(); } catch (e) {} return; }
+      if (pd && (k === "up" || k === "left")) { pd.classList.remove("focus"); if (IS_TV) pb.classList.add("focus"); try { pb.focus(); } catch (e) {} return; }
+      if (k === "ok" && pd && (d.activeElement === pd || pd.classList.contains("focus"))) { if (W.HKDonate) W.HKDonate.go(pd); else W.open(pd.href, "_blank", "noopener"); return; }
+      if (k === "ok") powerOn(); return;
+    }
     LOG.push(["key", k, S.mode, Date.now()]);
     if (DLG) return dlgKey(k);
     if (k === "cc") return toggleCC();

@@ -27,7 +27,7 @@
   G.locked = true;
   var de = D.documentElement; de.classList.add("cable-gated");
   var css = D.createElement("style");
-  css.textContent = "html.cable-gated body>*:not(#cable-gate){display:none!important}html.cable-gated,html.cable-gated body{background:#020a2a!important;overflow:hidden!important}" +
+  css.textContent = "html.cable-gated body>*:not(#cable-gate):not(.hkd-m){display:none!important}html.cable-gated,html.cable-gated body{background:#020a2a!important;overflow:hidden!important}" +
     "#cable-gate{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;" +
     "background:radial-gradient(ellipse at 50% 35%,#163a9c 0%,#06164a 55%,#020a2a 100%);font-family:Verdana,Tahoma,sans-serif;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom))}" +
     "#cable-gate .cg-in{max-width:900px;width:100%}#cable-gate img{width:min(60vw,360px);height:auto;display:block;margin:0 auto 4vmin}" +
@@ -37,18 +37,28 @@
     "#cable-gate .cg-u{background:linear-gradient(#3f63d6,#1b3a99);border:2px solid #8fb0ff;border-radius:12px;min-width:clamp(64px,15vmin,150px);padding:1.4vmin 1vmin;box-shadow:0 4px 18px rgba(0,0,0,.45)}" +
     "#cable-gate .cg-n{font:bold clamp(30px,9vmin,96px)/1 Verdana,sans-serif;color:#ffcc00;font-variant-numeric:tabular-nums}" +
     "#cable-gate .cg-l{font-size:clamp(10px,1.8vmin,16px);letter-spacing:2px;text-transform:uppercase;color:#cfe0ff;margin-top:.8vmin}" +
-    "#cable-gate .cg-f{font-size:clamp(11px,1.9vmin,17px);color:#9fb6ea}";
+    "#cable-gate .cg-f{font-size:clamp(11px,1.9vmin,17px);color:#9fb6ea}#cable-gate .cg-don{margin-top:3vmin}";
   (D.head || de).appendChild(css);
   var el = D.createElement("div"); el.id = "cable-gate"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Cable launches tonight at 10 PM ET");
   el.innerHTML = '<div class="cg-in"><img src="cable-logo-w.svg" alt="cable"><h1>cable &mdash; launches tonight at <b>10 PM ET</b></h1>' +
     '<p class="cg-sub">46 live channels, the program guide, ON DEMAND and My DVR. Free.</p>' +
     '<div class="cg-cd" aria-live="off"><div class="cg-u"><div class="cg-n" id="cg-h">--</div><div class="cg-l">Hours</div></div>' +
     '<div class="cg-u"><div class="cg-n" id="cg-m">--</div><div class="cg-l">Minutes</div></div><div class="cg-u"><div class="cg-n" id="cg-s">--</div><div class="cg-l">Seconds</div></div></div>' +
-    '<p class="cg-f">Thursday, November 19 &middot; 10:00 PM Eastern &middot; 9:00 PM Central &middot; 7:00 PM Pacific<br>Keep this screen open &mdash; it turns on by itself.</p></div>';
+    '<p class="cg-f">Thursday, November 19 &middot; 10:00 PM Eastern &middot; 9:00 PM Central &middot; 7:00 PM Pacific<br>Keep this screen open &mdash; it turns on by itself.</p>' +
+    '<div class="cg-don"><a class="hkd-btn hkd-lg" id="cg-donate" href="https://cash.app/$WrestleWorldPlus" target="_blank" rel="noopener" aria-label="Donate: support us on Cash App, $WrestleWorldPlus"><span class="hkd-l"><span class="hkd-ic" aria-hidden="true">$</span>DONATE</span><span class="hkd-s">Support us on Cash App &middot; $WrestleWorldPlus</span></a></div></div>';
   function mount() { if (!el.parentNode) (D.body || de).appendChild(el); }
   if (D.body) mount(); else D.addEventListener("DOMContentLoaded", mount);
   // swallow every key / remote press while gated (capture phase, before the app's handlers)
-  function block(e) { if (!G.locked) return; e.stopImmediatePropagation(); if (e.type === "keydown" && !/^(F5|F12)$/.test(e.key)) e.preventDefault(); }
+  // DONATE on the gate (2026-11-19): the QR modal (donate.js) gets its own keys; arrows focus the DONATE button, OK on it opens it
+  function block(e) {
+    if (!G.locked) return;
+    if (W.HKDonate && W.HKDonate.isOpen()) return;
+    e.stopImmediatePropagation(); if (e.type === "keydown" && !/^(F5|F12)$/.test(e.key)) e.preventDefault();
+    if (e.type !== "keydown") return;
+    var b = D.getElementById("cg-donate"); if (!b) return;
+    if (/^Arrow/.test(e.key) || (e.keyCode >= 37 && e.keyCode <= 40)) { b.classList.add("focus"); try { b.focus(); } catch (x) {} }
+    else if ((e.key === "Enter" || e.keyCode === 13 || e.keyCode === 23) && (D.activeElement === b || b.classList.contains("focus"))) { if (W.HKDonate) W.HKDonate.go(b); else W.open(b.href, "_blank", "noopener"); }
+  }
   ["keydown", "keyup", "keypress"].forEach(function (t) { W.addEventListener(t, block, true); });
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   var iv = null, sv = null;

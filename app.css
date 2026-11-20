@@ -291,3 +291,6 @@ html.tv .fbtn.focus{background:linear-gradient(#ffe066,#ffb400 60%,#e08a00);colo
 
 /* during a YouTube ad the player takes taps so its own Skip button works (2026-11-19) */
 #screen.adon #tap{pointer-events:none}#screen.adon #ytwrap.ad .ytp.on,#screen.adon #ytwrap.ad iframe{pointer-events:auto}
+
+/* DONATE (2026-11-19): power-on screen + ON DEMAND footer; button styles come from donate.js */
+.pw-donate{margin-top:14px}.od-fbtns .hkd-btn{font-size:11px;min-height:0;padding:.3em .9em;border-width:1px;align-self:center}
