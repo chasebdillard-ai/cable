@@ -1070,9 +1070,12 @@
 
   // ---------- input ----------
   var num = "", numT = null;
+  /* live feeds are sub-channels of 0 (2026-11-19): "01".."09" / "0.1".."0.9" -> "0.1".."0.9"; "010".."099" / "0.10".."0.99" -> "0.10".."0.99" (string, so 0.10 != 0.1).
+     Anything else is a plain channel number ("5", "27"). Returns the key compared with String(c.n). */
+  function chEntry(s) { var m = /^0\.?(\d{1,2})$/.exec(s); if (m && +m[1] > 0) return "0." + m[1]; return String(+s); }
   function numKey(dg) {
-    num = (num + dg).slice(-3); var e = $("#numentry"); e.textContent = num + "-"; e.hidden = false;
-    clearTimeout(numT); numT = setTimeout(function () { var n = /^0\d$/.test(num) ? +("0." + num.charAt(1)) : +num; /* 01-08 or 0.1-0.8 = live feeds (2026-11-19) */ num = ""; e.hidden = true; var c = CH.filter(function (c) { return c.n === n; })[0]; if (c) { if (S.mode !== "tv") setMode("tv"); tune(c.idx); } else toast("Channel " + n + " is not available"); }, 1600);
+    num = (num + dg).slice(-4); var e = $("#numentry"); e.textContent = num + "-"; e.hidden = false;
+    clearTimeout(numT); numT = setTimeout(function () { var n = chEntry(num); num = ""; e.hidden = true; var c = CH.filter(function (c) { return String(c.n) === n; })[0]; if (c) { if (S.mode !== "tv") setMode("tv"); tune(c.idx); } else toast("Channel " + n + " is not available"); }, 1600);
   }
   function key(k) {
     if (!S.started) {   // power-on screen: OK = watch TV; Down/Right moves to DONATE, Up/Left back to the OK button (2026-11-19)
@@ -1139,7 +1142,7 @@
   function powerOn() {
     if (W.CABLE_GATE && W.CABLE_GATE.locked) return; // launch gate (gate.js): nothing plays before launch
     if (S.started || !CH.length) return; S.started = true; S.soundOK = true; $("#power").hidden = true;
-    var last = +LS.getItem("cable_ch"), c = CH.filter(function (c) { return c.n === last; })[0] || CH[0];
+    var last = String(LS.getItem("cable_ch")), c = CH.filter(function (c) { return String(c.n) === last; })[0] || CH[0];
     setMode("tv"); tune(c.idx); showBanner(6000);
   }
   $("#pwbtn").addEventListener("click", powerOn);
