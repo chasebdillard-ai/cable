@@ -28,7 +28,7 @@
   var SRCLOGO = { AETV: "ae", NCIS: "cbs", CBS: "cbs", FortyEight: "cbs", SixtyMin: "cbs", TwoHalfMen: "cbs", Showtime: "showtime", History: "history", PawnStars: "history",
     Lifetime: "lifetime", TLC: "tlc", MTVRealityUK: "mtv", MTVVault: "mtv", Discovery: "discovery", Science: "science", NatGeo: "natgeo", COPS: "realcops", TruBlu: "trublu", WWF: "wwf", TheCW: "thecw",
     CWSports: "thecw", Reelz: "reelz", GSN: "gsn", OWN: "own", PBS: "pbs", PBSDocs: "pbs", Starz: "starz", WEtv: "wetv", Oxygen: "oxygen", BET: "bet",
-    PokemonTV: "kidswb", Pokemon: "kidswb", RegularShow: "cn", TotalDrama: "cn", AquaTeen: "cn", RickMorty: "cn" };
+    PokemonTV: "kidswb", Pokemon: "kidswb", RegularShow: "cn", TotalDrama: "cn", AquaTeen: "cn", RickMorty: "cn", PBSKids: "pbskids" };
   function lgInfo(id) { return LIVE && LIVE.logos && LIVE.logos[id]; }
   function imgLogo(id, alt, extra) { var L = lgInfo(id); return '<span class="lg lgi ' + (L[0] === "d" ? "pd" : "pl") + (extra || "") + '"><img src="logos/' + id + '.png" alt="' + esc(alt) + '" decoding="async" style="aspect-ratio:' + L[1] + '"></span>'; }
   function logo(c, big) {
@@ -315,7 +315,7 @@
     o = o || {}; n = (n + CH.length) % CH.length;
     if (n !== S.ch && !o.keepLast) S.last = S.ch;
     S.ch = n; S.vod = null; S.override = null; var c = CH[n];
-    LS.setItem("cable_ch", c.n);
+    LS.setItem("cable_chid", c.id); // saved by channel id (2026-11-20 guide renumber); numbers can change, ids never do
     $("#vodbar").hidden = true; $("#snow").hidden = true;
     if (!o.quiet) flash();   // cable-box channel change: a quick burst of static, previous picture held until the new one plays
     if (c.hls) { S.playing = "hls:" + c.id; tuneHls(c); }
@@ -591,7 +591,7 @@
   var SB = "https://cubbuiahnhgfpdeubldu.supabase.co", SBK = "sb_publishable_Sj8SNl5Zi0AwjxsIrNGNtQ_B--yHhYi", SKEY = "hvplus_session", PHONE_DOMAIN = "phone.blockbuster-plus.app";
   function session() { try { return JSON.parse(LS.getItem(SKEY) || "null"); } catch (e) { return null; } }
   function uid() { var s = session(); return s && s.user ? s.user.id : "guest"; }
-  function favs() { try { return JSON.parse(LS.getItem("cable_fav_" + uid()) || '{"ch":[],"sh":[]}'); } catch (e) { return { ch: [], sh: [] }; } }
+  function favs() { try { var f = JSON.parse(LS.getItem("cable_fav_" + uid()) || '{"ch":[],"sh":[]}'), al = (LIVE && LIVE.alias) || {}; f.ch = (f.ch || []).map(function (id) { return al[id] || id; }); return f; } catch (e) { return { ch: [], sh: [] }; } }
   function setFavs(f) { LS.setItem("cable_fav_" + uid(), JSON.stringify(f)); }
   function toggleFav(kind, id) { var f = favs(), a = f[kind], k = a.indexOf(id); if (k >= 0) a.splice(k, 1); else a.push(id); setFavs(f); toast(k >= 0 ? "Removed from Favorites" : "Added to Favorites \u2605"); }
   function sbAuth(path, body) { return fetch(SB + "/auth/v1/" + path, { method: "POST", headers: { apikey: SBK, "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }); }
@@ -1071,9 +1071,8 @@
 
   // ---------- input ----------
   var num = "", numT = null;
-  /* live feeds are sub-channels of 0 (2026-11-19): "01".."09" / "0.1".."0.9" -> "0.1".."0.9"; "010".."099" / "0.10".."0.99" -> "0.10".."0.99" (string, so 0.10 != 0.1).
-     Anything else is a plain channel number ("5", "27"). Returns the key compared with String(c.n). */
-  function chEntry(s) { var m = /^0\.?(\d{1,2})$/.exec(s); if (m && +m[1] > 0) return "0." + m[1]; return String(+s); }
+  /* 2026-11-20: the 0.x live-feed sub-channels are gone; every channel (live feeds mixed in) has a plain number 1..N. Returns the key compared with String(c.n). */
+  function chEntry(s) { return String(parseInt(s, 10) || 0); } // plain channel numbers 1..N since the 2026-11-20 renumber ("07" -> "7")
   function numKey(dg) {
     num = (num + dg).slice(-4); var e = $("#numentry"); e.textContent = num + "-"; e.hidden = false;
     clearTimeout(numT); numT = setTimeout(function () { var n = chEntry(num); num = ""; e.hidden = true; var c = CH.filter(function (c) { return String(c.n) === n; })[0]; if (c) { if (S.mode !== "tv") setMode("tv"); tune(c.idx); } else toast("Channel " + n + " is not available"); }, 1600);
@@ -1105,8 +1104,8 @@
       if (mo && (k === "up" || k === "chup" || k === "down" || k === "chdn")) { chUp(k === "up" || k === "chup" ? 1 : -1); return menuArm(); }
       if (k === "ok" || k === "left" || k === "right") { if (S.soundOK === false) unmute(); return menuOpen(); }
     }
-    if (k === "up" || k === "chup") return chUp(1);
-    if (k === "down" || k === "chdn") return chUp(-1);
+    if (k === "up" || k === "chup" || k === "pgup") return chUp(1);   // PageUp/PageDown = CH+/- on live TV too (keyboards, remotes that send them; README)
+    if (k === "down" || k === "chdn" || k === "pgdn") return chUp(-1);
     if (k === "ok" || k === "info" || k === "left" || k === "right") { if (S.soundOK === false) unmute(); return showBanner(8000); }
     if (k === "guide") return openGuide();
     if (k === "od") return openOD();
@@ -1157,10 +1156,19 @@
   ["pointerdown", "keydown", "touchend"].forEach(function (ev) { d.addEventListener(ev, function () { S.gesture = true; if (S.started && !$("#unmute").hidden) setTimeout(unmute, 0); }, true); });
   $("#unmute").addEventListener("click", function (e) { e.stopPropagation(); unmute(); });
 
+  /* last channel: stored by id in cable_chid. Older devices stored the channel NUMBER in cable_ch (before the 2026-11-20 renumber):
+     live.json "old" maps those numbers to ids and "alias" maps retired ids (ballylive -> stadium); migrated once, then cable_ch is removed. */
+  function chById(id) { id = (LIVE.alias || {})[id] || id; return CH.filter(function (c) { return c.id === id; })[0] || null; }
+  function savedCh() {
+    var id = LS.getItem("cable_chid"), c = id ? chById(id) : null;
+    if (!c) { var old = LS.getItem("cable_ch"); if (old != null && old !== "") { c = chById((LIVE.old || {})[String(old)] || ""); if (c) LS.setItem("cable_chid", c.id); } }
+    try { LS.removeItem("cable_ch"); } catch (e) {}
+    return c;
+  }
   function powerOn() {
     if (W.CABLE_GATE && W.CABLE_GATE.locked) return; // launch gate (gate.js): nothing plays before launch
     if (S.started || !CH.length) return; S.started = true; S.soundOK = true; $("#power").hidden = true;
-    var last = String(LS.getItem("cable_ch")), c = CH.filter(function (c) { return String(c.n) === last; })[0] || (IS_TV && CH.filter(function (c) { return !c.hls; })[0]) || CH[0];
+    var c = savedCh() || (IS_TV && CH.filter(function (c) { return !c.hls; })[0]) || CH[0];
     setMode("tv"); tune(c.idx); showBanner(6000);
   }
   $("#pwbtn").addEventListener("click", powerOn);
