@@ -6,10 +6,24 @@ button{font-family:inherit;color:inherit}
 #tv{position:fixed;inset:0;overflow:hidden;background:#000}
 /* the one video surface; JS positions it (full screen / guide preview / portrait top strip) */
 .screen{position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:5;overflow:hidden;transition:none}
-#ytwrap,#yt,#ytwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#ytwrap,#ytwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#ytwrap{overflow:hidden;background:#000}
+/* two players (A/B): only .on is visible. The player box is 4/3 taller than the screen, so a 16:9 picture still fills the screen exactly while
+   YouTube's title bar (top) and logo / "Watch on YouTube" strip (bottom) fall outside it. During a YouTube ad the box goes back to normal so the ad's own UI shows. */
+.ytp{position:absolute;left:0;width:100%;top:-16.667%;height:133.333%;opacity:0;z-index:0}
+.ytp.on{opacity:1;z-index:1}
+#ytwrap.ad .ytp.on{top:0;height:100%}
+#cover{position:absolute;inset:0;z-index:2;background:#000;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;font-family:Verdana,Tahoma,sans-serif}
+#cover .cv-in{display:flex;flex-direction:column;align-items:center;gap:.5em}
+#cover .cv-num{font:bold clamp(28px,7vmin,72px)/1 Verdana,sans-serif;color:#ffcc00;letter-spacing:2px}
+#cover .cv-logo{max-width:40%;min-height:1em}#cover .cv-logo img{max-height:9vmin;max-width:100%}
+#cover .cv-txt{font-size:clamp(11px,2.2vmin,18px);color:#cfe0ff;letter-spacing:1px}
+#cover.cv-stand{background:rgba(0,0,0,.82)}
+#tunefx{position:absolute;inset:0;z-index:3;pointer-events:none;background:repeating-linear-gradient(0deg,#222 0 2px,#555 2px 3px,#111 3px 5px);animation:snow .12s steps(3) infinite;opacity:.9}
+#bug[data-id="wwf"] img{filter:drop-shadow(0 0 2px rgba(0,0,0,.7))}
 /* the player never takes pointer or keyboard focus: every tap/click lands on our own layers above it */
-#ytwrap iframe{pointer-events:none}
-#hls{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain}
+#ytwrap iframe,.ytp{pointer-events:none}
+#hls{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain;z-index:1} /* above the (stopped, opaque) YouTube player, under cover/snow/tap */
 #tap{position:absolute;inset:0;z-index:3;cursor:pointer}
 #unmute{position:absolute;z-index:4;right:12px;top:12px;background:rgba(0,0,0,.75);border:2px solid #ffcc00;color:#ffcc00;border-radius:8px;padding:8px 12px;font-weight:bold;font-size:14px}
 #snow{position:absolute;inset:0;z-index:2;background:repeating-linear-gradient(0deg,#222 0 2px,#444 2px 3px,#111 3px 5px);display:flex;align-items:center;justify-content:center;animation:snow .2s steps(3) infinite}
@@ -272,3 +286,5 @@ img.brand.big{height:clamp(56px,14vmin,110px);margin:0 auto}
 }
 html.tv .fbtn:hover{background:linear-gradient(#4f6fcf,#203f9a 60%,#16307c);color:#fff}
 html.tv .fbtn.focus{background:linear-gradient(#ffe066,#ffb400 60%,#e08a00);color:#000}
+
+.pw-app{display:inline-block;margin-top:16px;color:#ffcc00;font-size:13px;font-weight:bold;text-decoration:none;border:1px solid #ffcc00;border-radius:14px;padding:4px 14px}.pw-app:hover,.pw-app:focus{background:#ffcc00;color:#06164a}html.app .pw-app{display:none}

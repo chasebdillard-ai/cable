@@ -11,22 +11,35 @@
 <title>Cable · Digital Cable</title>
 <meta name="description" content="Cable: free 24/7 live channels and ON DEMAND, the 2006 digital cable way.">
 <meta property="og:title" content="Cable · Digital Cable">
-<meta property="og:description" content="40 live channels, a real program guide and ON DEMAND - full episodes, movies and documentaries, free.">
+<meta property="og:description" content="46 live channels, a real program guide and ON DEMAND - full episodes, movies and documentaries, free.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://chasebdillard-ai.github.io/cable/og.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="app.css?v=7e4406b3">
+<link rel="apple-touch-startup-image" href="splash/launch-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-1640x2360.png" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-1668x2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="splash/launch-1488x2266.png" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="stylesheet" href="app.css?v=640136c7">
 <link rel="preconnect" href="https://www.youtube.com">
 <link rel="preconnect" href="https://i.ytimg.com">
 </head>
 <body>
 <div id="tv">
   <div id="screen" class="screen">
-    <div id="ytwrap"><div id="yt"></div></div>
+    <div id="ytwrap"><div class="ytp on" id="yp0"><div id="yt0"></div></div><div class="ytp" id="yp1"><div id="yt1"></div></div></div>
     <video id="hls" playsinline webkit-playsinline preload="auto" hidden></video>
+    <div id="cover" hidden><div class="cv-in"><div class="cv-num"></div><div class="cv-logo"></div><div class="cv-txt">Tuning&hellip;</div></div></div>
+    <div id="tunefx" hidden></div>
     <div id="snow" hidden><div class="snowtxt"><b>Technical difficulties</b><span>Please stand by</span></div></div>
     <div id="bug" aria-hidden="true"><img alt="" decoding="async"><span></span></div>
     <div id="tap" aria-hidden="true"></div>
@@ -122,9 +135,10 @@
       <div class="pw-load">Loading channel lineup&hellip;</div>
       <button type="button" id="pwbtn" class="fbtn big" disabled>&#9654; Press OK to watch TV</button>
       <div class="pw-tips">Arrow keys / CH &#9650;&#9660; change channels &middot; G = Guide &middot; D = ON DEMAND &middot; I = Info &middot; R = Record &middot; V = My DVR &middot; C = Captions &middot; type a channel number</div>
+      <a class="pw-app" href="tv.html">&#9632; Get the App &middot; Watch on TV</a>
     </div>
   </div>
 </div>
-<script src="app.js?v=ef6bdc55"></script>
+<script src="app.js?v=1551c8a0"></script>
 </body>
 </html>

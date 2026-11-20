@@ -1,4 +1,4 @@
-/* Cable - 2006 digital cable mimic. Live channels = deterministic schedules over free full-length YouTube videos (+3 real HLS networks).
+/* Cable - 2006 digital cable mimic. Live channels = deterministic schedules over free full-length YouTube videos (+8 real HLS networks).
    Modes: tv (full video + flip-bar banner), guide (i-Guide grid), od (ON DEMAND menus), vod (on-demand playback). One persistent YouTube player. */
 (function () {
   "use strict";
@@ -8,7 +8,7 @@
   if (IS_TV) d.documentElement.classList.add("tv");
   var APPLE = /iP(hone|ad|od)/.test(UA) || (/Safari\//.test(UA) && /Apple/.test(navigator.vendor || "") && !/Chrome|Chromium|CriOS|Android/.test(UA));
   var CAT = null, LIVE = null, SRC = [], SHOWS = [], PEOPLE = [], GEN = [], VV = [], CH = [], VIDX = {};
-  var TYPEN = { E: "Episode", M: "Movie", D: "Documentary", S: "Special", K: "Marathon" };
+  var TYPEN = { E: "Episode", M: "Movie", D: "Documentary", S: "Special", K: "Marathon", F: "Full Event", W: "Full Match" }, TYPEP = { W: "Full Matches", D: "Documentaries" };
   var S = { mode: "boot", ch: 0, last: 0, playing: null, vod: null, override: null, started: false, soundOK: false, bad: {} };
   var LS = W.localStorage || { getItem: function () { return null; }, setItem: function () {}, removeItem: function () {} };
   S.cc = LS.getItem("cable_cc") === "1"; // closed captions: OFF unless this device turned them on
@@ -26,7 +26,7 @@
   function vtitle(v) { var sh = v.sh >= 0 ? SHOWS[v.sh].n : ""; return sh ? sh + (v.s || v.e ? " (S" + (v.s || "?") + (v.e ? ", E" + v.e : "") + ")" : "") + ": " + v.t : v.t; }
   // real network logos (Wikimedia Commons / Wikipedia, downloaded into logos/): LIVE.logos[id] = [plate l|d, aspect, mono aspect]
   var SRCLOGO = { AETV: "ae", NCIS: "cbs", CBS: "cbs", FortyEight: "cbs", SixtyMin: "cbs", TwoHalfMen: "cbs", Showtime: "showtime", History: "history", PawnStars: "history",
-    Lifetime: "lifetime", TLC: "tlc", MTVRealityUK: "mtv", MTVVault: "mtv", Discovery: "discovery", Science: "science", NatGeo: "natgeo", COPS: "realcops", TheCW: "thecw",
+    Lifetime: "lifetime", TLC: "tlc", MTVRealityUK: "mtv", MTVVault: "mtv", Discovery: "discovery", Science: "science", NatGeo: "natgeo", COPS: "realcops", TruBlu: "trublu", WWF: "wwf", TheCW: "thecw",
     CWSports: "thecw", Reelz: "reelz", GSN: "gsn", OWN: "own", PBS: "pbs", PBSDocs: "pbs", Starz: "starz", WEtv: "wetv", Oxygen: "oxygen", BET: "bet",
     PokemonTV: "kidswb", Pokemon: "kidswb", RegularShow: "cn", TotalDrama: "cn", AquaTeen: "cn", RickMorty: "cn" };
   function lgInfo(id) { return LIVE && LIVE.logos && LIVE.logos[id]; }
@@ -73,50 +73,133 @@
   function nextOf(c, p) { var k = (p.k + 1) % c.seq.length; return { k: k, i: c.seq[k], start: p.end, end: p.end + VV[c.seq[k]][2] }; }
   function progs(c, t0, t1) { if (c.hls) return [{ live: 1, start: t0 - 3600, end: t1 + 3600 }]; var out = [], p = at(c, t0); while (p.start < t1 && out.length < 60) { out.push(p); p = nextOf(c, p); } return out; }
 
-  // ---------- YouTube player ----------
-  var YTP = null, ytReady = false, ytQ = null;
+  // ---------- YouTube player: two players (A/B) with cable-box cuts (2026-11-19) ----------
+  // The ACTIVE player is on screen; the STANDBY player loads the next program / channel off screen and is cut in only when it really
+  // plays (or when YouTube runs an ad, which has to stay visible). Until then the previous picture stays up (muted) or our own slate covers.
+  // Every load starts muted (sound autoplay is blocked without a user gesture, which used to leave players stuck "buffering");
+  // sound comes on as soon as the page has a user gesture (remembered). Watchdog: an error, or no picture within ~6 s -> next scheduled item.
+  var YTP = null, ytReady = false, ytQ = null, PL = [], act = 0, job = null, LOG = W.CABLE_LOG = [];
+  var BADK = "cable_bad", NOWD = /[?&]nowd=1/.test(location.search); // nowd=1: no timeout skips (headless tests where YouTube never decodes)
+  try { var bb0 = JSON.parse(LS.getItem(BADK) || "{}"), tn0 = Date.now(); Object.keys(bb0).forEach(function (k) { if (tn0 - bb0[k] < 7 * 864e5) S.bad[k] = 1; }); } catch (e) {}
+  function markBad(id, why) { S.bad[id] = 1; LOG.push(["bad", id, why, Date.now()]); try { var bb = JSON.parse(LS.getItem(BADK) || "{}"); bb[id] = Date.now(); LS.setItem(BADK, JSON.stringify(bb)); } catch (e) {} }
   function loadYT() {
     var s = d.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; d.head.appendChild(s);
-    W.onYouTubeIframeAPIReady = function () {
-      YTP = new YT.Player("yt", { width: "100%", height: "100%", host: "https://www.youtube.com",
-        playerVars: { autoplay: 0, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: location.origin,
-          cc_load_policy: S.cc ? 1 : 0, cc_lang_pref: "en" },
-        events: { onReady: function () { ytReady = true; var f = YTP.getIframe && YTP.getIframe(); if (f) { f.setAttribute("allow", "autoplay; encrypted-media"); f.setAttribute("tabindex", "-1"); f.setAttribute("aria-hidden", "true"); }
-            if (ytQ) { var q = ytQ; ytQ = null; ytLoad(q.id, q.at); } },
-          onStateChange: onYTState, onError: onYTError, onApiChange: function () { applyCC(); } } });
-    };
+    W.onYouTubeIframeAPIReady = function () { mkPlayer(0); mkPlayer(1); };
   }
-  var LOG = W.CABLE_LOG = [];
-  function ytLoad(id, start) {
-    LOG.push(["load", id, Math.round(start || 0), Date.now()]);
-    if (!ytReady) { ytQ = { id: id, at: start }; return; }
-    try { YTP.loadVideoById({ videoId: id, startSeconds: Math.max(0, Math.floor(start || 0)) }); if (S.soundOK) { YTP.unMute(); YTP.setVolume(100); } YTP.playVideo(); } catch (e) {}
-    S.ccFor = null; setTimeout(applyCC, 700); setTimeout(applyCC, 2200); refocus();
-    clearTimeout(ytLoad.wd); ytLoad.wd = setTimeout(function () { // muted-autoplay fallback
-      try { var st = YTP.getPlayerState(); if (st !== 1 && st !== 3) { YTP.mute(); YTP.playVideo(); $("#unmute").hidden = false; } } catch (e) {}
-    }, 2500);
+  function mkPlayer(n) {
+    var p = new YT.Player("yt" + n, { width: "100%", height: "100%", host: "https://www.youtube.com",
+      playerVars: { autoplay: 0, mute: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: location.origin,
+        cc_load_policy: S.cc ? 1 : 0, cc_lang_pref: "en" },
+      events: { onReady: function () { p.rdy = 1; var f = p.getIframe && p.getIframe(); if (f) { f.setAttribute("allow", "autoplay; encrypted-media"); f.setAttribute("tabindex", "-1"); f.setAttribute("aria-hidden", "true"); }
+          if (PL[0] && PL[0].rdy && PL[1] && PL[1].rdy && !ytReady) { ytReady = true; YTP = PL[act]; if (ytQ) { var q = ytQ; ytQ = null; ytLoad(q.id, q.at, q.o); } } },
+        onStateChange: function (e) { onYTState(n, e); }, onError: function (e) { onYTError(n, e); }, onApiChange: function () { if (n === act) applyCC(); } } });
+    PL[n] = p;
   }
-  function ytStop() { try { if (ytReady) YTP.pauseVideo(); } catch (e) {} }
-  function onYTState(e) {
-    LOG.push(["state", e.data, Date.now()]);
-    if (e.data === 1) { $("#snow").hidden = true; try { if (!YTP.isMuted()) $("#unmute").hidden = true; } catch (x) {} if (S.ccFor !== S.playing) { S.ccFor = S.playing; applyCC(); } refocus(); }
-    if (e.data === 0) { // ended
-      if (S.mode === "vod" || S.vod) return vodNext();
-      S.override = null; tune(S.ch, { quiet: true });
-    }
+  function hasGesture() { return !!W.CableNative || S.gesture || !!(navigator.userActivation && navigator.userActivation.hasBeenActive); }
+  // our own layers over the picture: #cover = black slate with the channel (tuning / please stand by), #tunefx = quick static on a channel change
+  function cover(mode, txt) {
+    var cv = $("#cover");
+    if (!mode) { cv.hidden = true; $("#snow").hidden = true; return; }
+    if (mode === "snow") { cv.hidden = true; $("#snow").hidden = false; return; }
+    var c = CH[S.ch], vod = S.vod;
+    $(".cv-num", cv).textContent = vod ? "" : c ? c.n : "";
+    $(".cv-logo", cv).innerHTML = vod ? "" : c ? logo(c) : "";
+    $(".cv-txt", cv).textContent = txt || (mode === "stand" ? "Please stand by" : vod ? "Loading program\u2026" : "Tuning\u2026");
+    cv.className = "cv-" + mode; cv.hidden = false;
   }
-  function onYTError(e) {
-    LOG.push(["error", e.data, Date.now()]);
-    if (S.vod) { toast("This program is unavailable - skipping"); S.bad[S.vod.id] = 1; return setTimeout(vodNext, 1200); }
+  function flash() { var f = $("#tunefx"); f.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(function () { f.hidden = true; }, 380); }
+  function ytLoad(id, start, o) {
+    o = o || {}; LOG.push(["load", id, Math.round(start || 0), Date.now()]);
+    if (!ytReady) { ytQ = { id: id, at: start, o: o }; cover("tune"); return; }
+    var sb = 1 - act, p = PL[sb];
+    if (job && !job.done) job.done = true;
+    var j = job = { id: id, start: Math.max(0, Math.floor(start || 0)), t0: Date.now(), n: sb, ok: false, ad: false, last: null, kick: false, o: o };
+    try { p.mute(); p.loadVideoById({ videoId: id, startSeconds: j.start }); p.playVideo(); } catch (e) {}
+    try { PL[act].mute(); } catch (e) {}
+    if (!o.keep || !S.picOK) { S.picOK = false; cover("tune"); }
+    S.ccFor = null; clearTimeout(tick.t); tick.t = setTimeout(tick, 250); refocus();
+  }
+  function tick() {
+    var j = job; if (!j || j.done) return;
+    var p = PL[j.n], st = -2, ct = 0; try { st = p.getPlayerState(); ct = p.getCurrentTime() || 0; } catch (e) {}
+    var el = Date.now() - j.t0, moving = j.last != null && ct > j.last + 0.08; j.last = ct;
+    if (st === 1 && moving && Math.abs(ct - j.start) < 30 + el / 1000) return live(j, false);
+    if (st !== 1 && moving && Math.abs(ct - j.start) > 4 && !j.ad) { j.ad = true; LOG.push(["ad", j.id, Date.now()]); live(j, true); }
+    if (!j.kick && el > 2500 && !moving) { j.kick = true; try { p.mute(); p.playVideo(); } catch (e) {} }
+    if (!j.ad && el > 6500 && !NOWD) return fail(j, "no-picture");
+    if (j.ad && el > 150000) return fail(j, "ad-stall");
+    tick.t = setTimeout(tick, 250);
+  }
+  function cut(n) {
+    if (n === act) return; var old = act; act = n; YTP = PL[act];
+    $("#yp" + act).classList.add("on"); $("#yp" + old).classList.remove("on");
+    try { PL[old].mute(); PL[old].stopVideo(); } catch (e) {}
+  }
+  function live(j, isAd) {
+    cut(j.n); $("#ytwrap").classList.toggle("ad", !!isAd); cover(null); S.picOK = true; S.skips = 0; S.tmo = 0;
+    sound();
+    if (isAd) return;
+    j.ok = j.done = true; j.okAt = Date.now(); LOG.push(["playing", j.id, j.okAt - j.t0, j.okAt]);
+    if (S.ccFor !== S.playing) { S.ccFor = S.playing; applyCC(); setTimeout(applyCC, 1500); }
+    refocus();
+  }
+  function sound() { // unmute when the browser allows it; otherwise stay muted with "Tap for sound"
+    var p = PL[act];
+    if (S.soundOK && hasGesture()) {
+      try { p.unMute(); p.setVolume(100); } catch (e) {}
+      setTimeout(function () { try { if (p !== PL[act]) return; if (p.getPlayerState() === 2) { p.mute(); p.playVideo(); needSound(); } else if (!p.isMuted()) $("#unmute").hidden = true; } catch (e) {} }, 900);
+    } else needSound();
+  }
+  function needSound() { var u = $("#unmute"); u.textContent = IS_TV ? "Press OK for sound" : "Tap for sound"; u.hidden = false; }
+  function fail(j, why) {
+    j.done = true;
+    if (why === "no-picture") { // could be the video, could be the connection: only remember it for this session, and after
+      S.bad[j.id] = 1; LOG.push(["bad", j.id, why, Date.now()]); // 3 timeouts in a row assume a weak connection and retry instead of skipping
+      if ((S.tmo = (S.tmo || 0) + 1) >= 3) { S.tmo = 0; delete S.bad[j.id]; cover("stand", "Weak signal – please stand by"); clearTimeout(fail.rt); fail.rt = setTimeout(function () { if (!S.vod && CH[S.ch] && !CH[S.ch].hls) { S.override = null; tune(S.ch, { quiet: true, keepLast: true }); } }, 8000); return; }
+    } else markBad(j.id, why);
+    if (j.o.vod || S.vod) { toast("This program is unavailable - skipping"); return vodNext(); }
     var c = CH[S.ch]; if (!c || c.hls) return;
-    var p = S.override || at(c, now()); S.bad[VV[p.i][0]] = 1;
-    var n = nextOf(c, p), tries = 0;
-    while (S.bad[VV[n.i][0]] && tries++ < 5) n = nextOf(c, n);
+    if ((S.skips = (S.skips || 0) + 1) > 6) { S.skips = 0; cover("snow"); return; }
+    var p = S.override && S.override.ch === S.ch ? S.override : at(c, now()), n = nextOf(c, p), tries = 0;
+    while (S.bad[VV[n.i][0]] && tries++ < 30) n = nextOf(c, n);
     S.override = { k: n.k, i: n.i, start: now(), end: now() + VV[n.i][2], ch: S.ch };
-    $("#snow").hidden = false; setTimeout(function () { $("#snow").hidden = true; }, 1500);
-    S.playing = VV[n.i][0]; ytLoad(VV[n.i][0], 0); showBanner();
+    S.playing = VV[n.i][0]; ytLoad(S.playing, 0, { keep: true }); if (S.mode === "tv" && !$("#banner").hidden) showBanner();
   }
-
+  function ytStop() { if (job) job.done = true; job = null; S.picOK = false; clearTimeout(tick.t); try { PL[0].stopVideo(); PL[1].stopVideo(); } catch (e) {} }
+  function onYTState(n, e) {
+    LOG.push(["state", e.data, Date.now(), n]);
+    if (n !== act || (job && !job.done && job.n === n)) return; // the standby player is handled by tick()
+    if (e.data === 0) { // ended: our slate instead of YouTube's end screen, then the next program
+      cover("tune", S.vod ? "Loading next program\u2026" : "");
+      if (S.mode === "vod" || S.vod) return vodNext();
+      S.override = null; S.picOK = false; tune(S.ch, { quiet: true, keepLast: true });
+    }
+    if (e.data === 1) { $("#ytwrap").classList.remove("ad"); cover(null); }
+  }
+  function onYTError(n, e) {
+    LOG.push(["error", e.data, Date.now(), n]);
+    if (job && !job.done && job.n === n) return fail(job, "error " + e.data);
+    if (n !== act) return;
+    markBad(S.playing, "error " + e.data);
+    if (S.vod) { toast("This program is unavailable - skipping"); return vodNext(); }
+    S.override = null; S.picOK = false; tune(S.ch, { quiet: true, keepLast: true });
+  }
+  // mid-program buffering on the active player: our "Please stand by" slate instead of YouTube's spinner
+  setInterval(function () {
+    if (!ytReady || !S.picOK || (job && !job.done) || $("#ytwrap").classList.contains("ad")) return;
+    var cv = $("#cover"), st = -2; try { st = YTP.getPlayerState(); } catch (e) {}
+    var c = CH[S.ch]; if (!S.vod && (!c || c.hls)) return;
+    if (st === 3 || st === -1) { stall.n = (stall.n || 0) + 1; if (stall.n >= 3) cover("stand"); } else { stall.n = 0; if (st === 1 && !cv.hidden && cv.className === "cv-stand") cover(null); }
+  }, 500);
+  function stall() {}
+  // pre-cue the next program in the standby player ~20 s before the boundary (metadata + first frames ready for the cut)
+  function precue() {
+    if (!ytReady || S.vod || !S.started || (job && !job.done)) return; var c = CH[S.ch]; if (!c || c.hls) return;
+    var p = S.override && S.override.ch === S.ch ? S.override : at(c, now()); if (p.end - now() > 20 || p.end - now() < 2) return;
+    var n = nextOf(c, p), id = VV[n.i][0]; if (precue.id === id) return; precue.id = id;
+    try { PL[1 - act].cueVideoById({ videoId: id, startSeconds: 0 }); LOG.push(["cue", id, Date.now()]); } catch (e) {}
+  }
+  setInterval(precue, 3000);
   // ---------- closed captions (default OFF; per-device choice; applied on every tune / next video) ----------
   function applyCC() {
     LOG.push(["cc", S.cc ? 1 : 0, Date.now()]);
@@ -154,20 +237,26 @@
     var v = $("#hls"); try { v.onerror = null; v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} v.hidden = true;
   }
   function tuneHls(c) {
-    killHls(); ytStop();
+    var hadYT = S.picOK && $("#hls").hidden; killHls(); if (job) job.done = true; job = null; try { PL[act].mute(); } catch (e) {}
+    if (!hadYT) { ytStop(); cover("tune"); }
     var v = $("#hls"), srcs = c.hls.slice(), i = 0, round = 0, medRec = 0, me = c;
-    v.hidden = false; v.muted = !S.soundOK;
-    function go() { var q = v.play(); if (q && q.catch) q.catch(function () { v.muted = true; $("#unmute").hidden = false; v.play().catch(function () {}); }); }
+    v.hidden = false; v.style.opacity = 0; v.muted = !(S.soundOK && hasGesture());
+    function go() { var q = v.play(); if (q && q.catch) q.catch(function () { v.muted = true; needSound(); v.play().catch(function () {}); }); }
     function fail() {
       if (CH[S.ch] !== me) return;
       if (hls) { try { hls.destroy(); } catch (e) {} hls = null; } clearInterval(hlsWd);
       i++; if (i < srcs.length) return play();
-      $("#snow").hidden = false; toast(me.name + " isn't responding - retrying", 4000);
+      ytStop(); cover("snow"); toast(me.name + " isn't responding - retrying", 4000);
       hlsRetry = setTimeout(function () { if (CH[S.ch] === me) { i = 0; round++; play(); } }, Math.min(60, 15 * (round + 1)) * 1000);
     }
     function watch() { var last = -1, still = 0; hlsWd = setInterval(function () { if (CH[S.ch] !== me || v.paused) { still = 0; return; } if (v.currentTime === last) { if (++still >= 2) fail(); } else { still = 0; last = v.currentTime; $("#snow").hidden = true; } }, 10000); }
     function play() {
       if (CH[S.ch] !== me) return; medRec = 0; var u = srcs[i]; LOG.push(["hls", u, Date.now()]);
+      if (/^yql:/.test(u)) {  // Yahoo video: resolve the current live URL from Yahoo's public streams API (CORS *), then play it
+        fetch("https://video-api.yql.yahoo.com/v1/video/sapi/streams/" + u.slice(4) + "?protocol=http&format=m3u8&site=sports&region=US&lang=en-US").then(function (r) { return r.json(); }).then(function (j) {
+          var st = j.query.results.mediaObj[0].streams[0]; srcs[i] = st.host + st.path.split("?")[0]; play();
+        }).catch(function () { fail(); }); return;
+      }
       if (APPLE && v.canPlayType("application/vnd.apple.mpegurl")) { v.onerror = fail; v.src = u; go(); watch(); return; }
       hlsLib().then(function () {
         if (CH[S.ch] !== me) return;
@@ -179,7 +268,7 @@
         hls.loadSource(u); hls.attachMedia(v); watch();
       }, function () { fail(); });
     }
-    v.onplaying = function () { $("#snow").hidden = true; if (!v.muted) $("#unmute").hidden = true; hlsCC(); refocus(); };
+    v.onplaying = function () { if (CH[S.ch] !== me) return; v.style.opacity = 1; ytStop(); S.picOK = true; cover(null); if (!v.muted) $("#unmute").hidden = true; else needSound(); hlsCC(); refocus(); };
     try { v.textTracks.onaddtrack = function () { hlsCC(); }; } catch (e) {}
     play();
   }
@@ -192,11 +281,14 @@
     S.ch = n; S.vod = null; S.override = null; var c = CH[n];
     LS.setItem("cable_ch", c.n);
     $("#vodbar").hidden = true; $("#snow").hidden = true;
+    if (!o.quiet) flash();   // cable-box channel change: a quick burst of static, previous picture held until the new one plays
     if (c.hls) { S.playing = "hls:" + c.id; tuneHls(c); }
     else {
-      killHls(); var p = at(c, now()), tries = 0;
-      while (S.bad[VV[p.i][0]] && tries++ < 5) p = nextOf(c, p);
-      S.playing = VV[p.i][0]; ytLoad(VV[p.i][0], Math.max(0, now() - p.start));
+      var fromHls = !$("#hls").hidden; killHls(); if (fromHls) S.picOK = false;
+      var p = at(c, now()), tries = 0;
+      while (S.bad[VV[p.i][0]] && tries++ < 30) p = nextOf(c, p);
+      if (tries) S.override = { k: p.k, i: p.i, start: p.start, end: p.end, ch: n };
+      S.playing = VV[p.i][0]; ytLoad(VV[p.i][0], Math.max(0, now() - p.start), { keep: true });
     }
     if (c.hls) { setBug(null, ""); $("#bug").dataset.own = c.id; } else { setBug(c.id, c.call); $("#bug").dataset.own = ""; } // live feeds already burn in their own bug
     if (!o.quiet || S.mode === "tv") { if (S.mode === "tv") showBanner(); }
@@ -695,6 +787,7 @@
     all.slice(0, 600).forEach(function (i) { items.push(vidItem(i, all)); });
     return { title: s.n, items: items, sel: 0 };
   }
+  function WWFK() { for (var n = 0; n < SRC.length; n++) if (SRC[n][0] === "WWF") return n; return -1; }
   function srcScreen(k) {
     var vids = IX().bySrc[k] || [], shs = {}, loose = [];
     vids.forEach(function (i) { var x = VV[i][4]; if (x >= 0) shs[x] = 1; else loose.push(i); });
@@ -702,7 +795,13 @@
     if (chs.length) { items.push({ hd: 1, label: "On live TV" }); chs.forEach(function (c) { items.push({ label: c.n + " " + c.name, logo: logo(c), go: function () { tune(c.idx); goLive(); } }); }); }
     var sl = Object.keys(shs).map(Number).sort(function (a, b) { return SHOWS[b].vids.length - SHOWS[a].vids.length; });
     if (sl.length) { items.push({ hd: 1, label: "Shows" }); sl.forEach(function (n) { items.push(showItem(n)); }); }
-    if (loose.length) { items.push({ hd: 1, label: "Movies, documentaries & specials" }); loose.slice(0, 400).forEach(function (i) { items.push(vidItem(i, loose)); }); }
+    if (SRC[k][0] === "WWF") { // WWF Network: events + year facets (2026-11-19)
+      var yrs = {}; vids.forEach(function (i) { var y = VV[i][8]; if (y) (yrs[y] = yrs[y] || []).push(i); });
+      items.push({ hd: 1, label: "By year" });
+      Object.keys(yrs).sort().forEach(function (y) { var l = yrs[y].slice().sort(function (a, b) { return (VV[a][9] || "").localeCompare(VV[b][9] || ""); }); items.push({ label: "WWF " + y, count: l.length, ic: "&#9658;", art: thumb(VV[l[0]][0]), screen: function () { return listScreen("WWF " + y, l); } }); });
+      ["F", "W"].forEach(function (t) { var l = vids.filter(function (i) { return VV[i][7] === t; }); if (l.length) items.push({ label: TYPEP[t] || TYPEN[t] + "s", count: l.length, ic: "&#9658;", screen: function () { return listScreen("WWF " + (TYPEP[t] || TYPEN[t] + "s"), l); } }); });
+    }
+    if (loose.length) { items.push({ hd: 1, label: SRC[k][0] === "WWF" ? "More full matches & events" : "Movies, documentaries & specials" }); loose.slice(0, 400).forEach(function (i) { items.push(vidItem(i, loose)); }); }
     return { title: SRC[k][1], items: items, netlogo: srcLogoId(k) };
   }
   function deptScreen(dept) {
@@ -760,7 +859,7 @@
           var sl = Object.keys(shs).map(Number); if (sl.length) { items.push({ hd: 1, label: "Shows that premiered in the " + dc + "s" }); sl.forEach(function (n) { items.push(showItem(n)); }); }
           if (loose.length) { items.push({ hd: 1, label: "Movies & documentaries" }); loose.forEach(function (i) { items.push(vidItem(i, loose)); }); } return { title: dc + "s", items: items }; } }; }) };
   }
-  function typeScreen() { var bt = IX().byType; return { title: "Program Type", items: ["E", "M", "D", "S", "K"].filter(function (t) { return (bt[t] || []).length; }).map(function (t) { return { label: TYPEN[t] + "s", count: bt[t].length, ic: "&#9658;", art: thumb(VV[bt[t][0]][0]), screen: function () { return listScreen(TYPEN[t] + "s (newest first)", bt[t], { withShow: true, max: 500 }); } }; }) }; }
+  function typeScreen() { var bt = IX().byType; return { title: "Program Type", items: ["E", "M", "D", "S", "K", "F", "W"].filter(function (t) { return (bt[t] || []).length; }).map(function (t) { return { label: TYPEP[t] || TYPEN[t] + "s", count: bt[t].length, ic: "&#9658;", art: thumb(VV[bt[t][0]][0]), screen: function () { return listScreen(TYPEN[t] + "s (newest first)", bt[t], { withShow: true, max: 500 }); } }; }) }; }
   function networksScreen() { var bs = IX().bySrc; return { title: "Networks", items: SRC.map(function (s, k) { return k; }).filter(function (k) { return (bs[k] || []).length; }).sort(function (a, b) { return SRC[a][1].localeCompare(SRC[b][1]); }).map(function (k) { return { label: SRC[k][1], count: bs[k].length, ic: srcLogo(k) ? "" : "&#9658;", logo: srcLogo(k), art: thumb(VV[bs[k][0]][0]), netlogo: srcLogoId(k), info: (srcLogo(k) ? '<div class="od-netlogo">' + srcLogo(k) + "</div>" : "") + "<h3>" + esc(SRC[k][1]) + '</h3><div class="m">' + esc(SRC[k][2]) + " \u00b7 YouTube " + esc(SRC[k][4]) + "</div><p>" + bs[k].length + " free full-length programs.</p>", screen: function () { return srcScreen(k); } }; }) }; }
   function liveByGenreScreen() {
     var gs = {}; CH.forEach(function (c) { c.g.forEach(function (g) { (gs[g] = gs[g] || []).push(c); }); });
@@ -854,6 +953,7 @@
       { label: "Free Movies", ic: "&#9654;", count: (IX().byType.M || []).length, screen: function () { return moviesScreen(true); } },
       D("Kids", "&#9679;", "Kids"), D("Music & MTV", "&#9835;", "Music/MTV"), D("Documentaries", "&#9654;", "Documentaries"), D("True Crime", "&#9679;", "True Crime"),
       D("Reality", "&#9679;", "Reality"), D("Game Shows", "&#9670;", "Game Shows"),
+      { label: "WWF Network", ic: "&#9733;", count: (IX().bySrc[WWFK()] || []).length, screen: function () { return srcScreen(WWFK()); }, info: "<h3>WWF Network</h3><p>1980s &amp; early-'90s WWF: WrestleMania I-IX, Royal Rumble, SummerSlam, Survivor Series, Saturday Night's Main Event, MSG and more. By event and by year.</p>" },
       { hd: 1, label: "Browse by" },
       { label: "Networks", ic: "&#9658;", screen: networksScreen }, { label: "TV Shows A-Z", ic: "&#9632;", count: SHOWS.length, screen: azScreen },
       { label: "Actors & Actresses", ic: "&#9679;", screen: peopleScreen }, { label: "Genres", ic: "&#9658;", screen: genresScreen },
@@ -863,7 +963,8 @@
       { hd: 1, label: "Me" },
       { label: "My DVR / Recordings", ic: '<i class="rd"></i>', go: openDVR, info: "<h3>My DVR</h3><p>Your recordings, scheduled recordings and series recordings. Recorded programs play from the start, any time.</p>" },
       { label: "My Favorites", ic: "&#9733;", screen: favScreen },
-      { label: s && s.user ? "My Account" : "Sign In / Create Account", ic: "&#9679;", screen: accountScreen }
+      { label: s && s.user ? "My Account" : "Sign In / Create Account", ic: "&#9679;", screen: accountScreen },
+      { label: "Get the App / Watch on TV", ic: "&#9632;", go: function () { location.href = "tv.html"; }, info: "<h3>Get the App</h3><p>Cable on Fire TV, Google TV, Android TV, phones, tablets, iPhone and iPad. Fire TV / Google TV: Downloader code <b>4793854</b>.</p>" }
     ];
     return { title: "Main Menu", items: it };
   }
@@ -872,7 +973,7 @@
   function playVod(i, ctx) {
     S.vod = { i: i, id: VV[i][0], ctx: ctx || [i] }; killHls(); setMode("vod"); S.playing = VV[i][0];
     var nb = vodNet(i); setBug(nb.id, nb.txt); $("#bug").dataset.own = ""; recUI();
-    ytLoad(VV[i][0], 0); vodBar();
+    ytLoad(VV[i][0], 0, { vod: true, keep: false }); vodBar();
   }
   function vodNext() {
     if (!S.vod) return; var c = S.vod.ctx, k = c.indexOf(S.vod.i);
@@ -952,12 +1053,15 @@
   var KEYMAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "ok", " ": "ok", Escape: "back", Backspace: "back", BrowserBack: "back", GoBack: "back",
     PageUp: "pgup", PageDown: "pgdn", ChannelUp: "chup", ChannelDown: "chdn", MediaTrackNext: "chup", MediaTrackPrevious: "chdn", g: "guide", G: "guide", ContextMenu: "guide", Guide: "guide",
     d: "od", D: "od", i: "info", I: "info", Info: "info", l: "last", L: "last", "+": "chup", "-": "chdn", "=": "chup", MediaPlayPause: "pp",
-    r: "rec", R: "rec", MediaRecord: "rec", v: "dvr", V: "dvr", c: "cc", C: "cc", Subtitle: "cc", ClosedCaptionToggle: "cc", f: "fs", F: "fs" };
+    r: "rec", R: "rec", MediaRecord: "rec", v: "dvr", V: "dvr", c: "cc", C: "cc", Subtitle: "cc", ClosedCaptionToggle: "cc", f: "fs", F: "fs",
+    MediaFastForward: "ff", MediaRewind: "rw", FastFwd: "ff", Rewind: "rw", ColorF0Red: "rec", ColorF1Green: "cc", ColorF2Yellow: "dvr", ColorF3Blue: "od", DVR: "dvr", MediaLast: "last", MediaPlay: "pp", MediaPause: "pp" };
   d.addEventListener("keydown", function (e) {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName) && !/Escape|ArrowUp|ArrowDown/.test(e.key)) return;
     if (/^[0-9]$/.test(e.key) && S.started && S.mode !== "od") { e.preventDefault(); return numKey(e.key); }
-    var k = KEYMAP[e.key] || (e.keyCode === 4 || e.keyCode === 461 || e.keyCode === 10009 ? "back" : e.keyCode === 427 ? "chup" : e.keyCode === 428 ? "chdn" : e.keyCode === 457 ? "info" : e.keyCode === 416 ? "rec" : e.keyCode === 460 ? "cc" : null);
+    var k = KEYMAP[e.key] || (e.keyCode === 4 || e.keyCode === 461 || e.keyCode === 10009 ? "back" : e.keyCode === 427 ? "chup" : e.keyCode === 428 ? "chdn" : e.keyCode === 457 ? "info" : e.keyCode === 416 ? "rec" : e.keyCode === 460 ? "cc" : e.keyCode === 403 ? "rec" : e.keyCode === 404 ? "cc" : e.keyCode === 405 ? "dvr" : e.keyCode === 406 ? "od" : e.keyCode === 417 ? "ff" : e.keyCode === 412 ? "rw" : e.keyCode === 415 || e.keyCode === 19 ? "pp" : null);
     if (!k) return;
+    // FF / RW: +/-30 s in ON DEMAND playback, otherwise channel up/down (guide/menus: page) - for remotes with no CH buttons (Fire TV, Google TV)
+    if (k === "ff" || k === "rw") { if (S.mode === "vod" && !DLG) { e.preventDefault(); e.stopPropagation(); vodAct(k); return; } k = k === "ff" ? "chup" : "chdn"; }
     if (S.mode === "guide" && (k === "chup" || k === "chdn")) k = k === "chup" ? "pgup" : "pgdn";
     if (S.mode === "od" && (k === "chup" || k === "chdn")) k = k === "chup" ? "pgup" : "pgdn";
     if (k === "pp") { e.preventDefault(); if (S.mode === "vod" && !DLG) vodAct("pp"); return; }
@@ -971,7 +1075,9 @@
   // a pressed on-screen button must not keep focus (Enter/OK would re-press it instead of reaching the remote handler)
   d.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("button"); if (b && !b.closest(".od-form") && !b.closest(".od-search")) setTimeout(function () { try { b.blur(); } catch (x) {} }, 0); });
   if (!d.documentElement.requestFullscreen && !d.documentElement.webkitRequestFullscreen) $$('[data-r="fs"]').forEach(function (b) { b.hidden = true; });
-  function unmute() { S.soundOK = true; try { if (ytReady) { YTP.unMute(); YTP.setVolume(100); } } catch (e) {} var v = $("#hls"); if (!v.hidden) { v.muted = false; v.play().catch(function () {}); } $("#unmute").hidden = true; }
+  function unmute() { S.soundOK = true; S.gesture = true; LS.setItem("cable_sound", "1"); try { if (ytReady) { YTP.unMute(); YTP.setVolume(100); if (YTP.getPlayerState() === 2) YTP.playVideo(); } } catch (e) {} var v = $("#hls"); if (!v.hidden) { v.muted = false; v.play().catch(function () {}); } $("#unmute").hidden = true; }
+  // the first touch / click / key anywhere counts as the gesture that turns sound on (remembered per device)
+  ["pointerdown", "keydown", "touchend"].forEach(function (ev) { d.addEventListener(ev, function () { S.gesture = true; if (S.started && !$("#unmute").hidden) setTimeout(unmute, 0); }, true); });
   $("#unmute").addEventListener("click", function (e) { e.stopPropagation(); unmute(); });
 
   function powerOn() {
@@ -990,7 +1096,7 @@
     $(".pw-load").textContent = CH.length + " channels \u00b7 " + VV.length.toLocaleString() + " free programs ON DEMAND";
     var b = $("#pwbtn"); b.disabled = false; if (IS_TV) b.classList.add("focus"); try { b.focus(); } catch (e) {}
     ccUI(); recUI();
-    W.CABLE = { S: S, CH: CH, at: at, tune: tune, key: key, V: V, openOD: openOD, openGuide: openGuide, openDVR: openDVR, dvr: dvr, dvrEntries: dvrEntries, G: G, dlg: function () { return DLG; }, nextOf: nextOf, VIDX: VIDX, YTP: function () { return YTP; }, search: searchItems, push: push, screens: { peopleScreen: peopleScreen, genresScreen: genresScreen, decadeScreen: decadeScreen, typeScreen: typeScreen, networksScreen: networksScreen, azScreen: azScreen, searchScreen: searchScreen } };
+    W.CABLE = { S: S, CH: CH, at: at, tune: tune, key: key, V: V, openOD: openOD, openGuide: openGuide, openDVR: openDVR, dvr: dvr, dvrEntries: dvrEntries, G: G, dlg: function () { return DLG; }, nextOf: nextOf, VIDX: VIDX, YTP: function () { return YTP; }, job: function () { return job; }, search: searchItems, push: push, screens: { srcScreen: srcScreen, WWFK: WWFK, typeScreen2: typeScreen, peopleScreen: peopleScreen, genresScreen: genresScreen, decadeScreen: decadeScreen, typeScreen: typeScreen, networksScreen: networksScreen, azScreen: azScreen, searchScreen: searchScreen } };
     if (/[?&]autostart=1/.test(location.search)) powerOn();
   }).catch(function (e) { $(".pw-load").textContent = "Couldn't load the lineup - check your connection."; });
 })();

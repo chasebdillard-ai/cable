@@ -29,14 +29,15 @@ add <code>&amp;ua=tv</code> / <code>&amp;w=390&amp;h=844</code> to emulate a siz
       var CH = W.CABLE.CH, i = +(q.get('from') || 0), lim = +(q.get('n') || CH.length);
       (function next() {
         if (i >= Math.min(CH.length, lim)) {
-          var ok = res.filter(function (r) { return r.t != null && r.t <= 5; }).length;
-          return done(res, 'CHANNELS ' + ok + '/' + res.length + ' playing within 5 s (' + Math.round(100 * ok / res.length) + '%)');
+          var ok = res.filter(function (r) { return r.t != null && r.t <= 5; }).length, pic = res.filter(function (r) { return (r.t != null && r.t <= 5) || (r.pic != null && r.pic <= 5); }).length;
+          return done(res, 'CHANNELS ' + ok + '/' + res.length + ' playing within 5 s (' + Math.round(100 * ok / res.length) + '%); picture (program or YouTube ad) within 5 s: ' + pic + '/' + res.length);
         }
         var c = CH[i], idx = i++, t0 = Date.now(), L = W.CABLE_LOG, l0 = L.length, last = null, r = { n: c.n, name: c.name, t: null, err: [], muted: null };
         W.CABLE.tune(idx);
         var p = setInterval(function () {
           var el = Date.now() - t0, playing = false;
           if (c.hls) { var v = W.document.getElementById('hls'); if (v && !v.paused && v.currentTime > 0) { if (last != null && v.currentTime > last + 0.2) playing = true; last = v.currentTime; r.muted = v.muted; } }
+          else if (W.CABLE.job) { var jb = W.CABLE.job(); var s0 = cur(W); r.muted = s0.m; if (jb && jb.t0 >= t0 - 50) { if (jb.ad && r.pic == null) r.pic = Math.round((Date.now() - t0) / 100) / 10; if (jb.ad) r.ad = true; if (jb.ok) { playing = true; el = jb.okAt - t0; if (r.pic == null) r.pic = Math.round(el / 100) / 10; } } }
           else { var s = cur(W); r.muted = s.m; var y0; try { y0 = W.CABLE.YTP(); } catch (e) {} var du = 0, lf = 0; try { du = Math.round(y0.getDuration()); lf = Math.round(y0.getVideoLoadedFraction() * 100); } catch (e) {}
             if (q.get('trace')) { var tk = Math.floor(el / 1000); if (tk !== r._tk) { r._tk = tk; (r.tr = r.tr || []).push(tk + ':' + s.st + '/' + Math.round(s.t) + '/' + du + '/' + lf); } }
             if (s.st === 1) { if (last != null && s.t > last + 0.15) playing = true; last = s.t; } }
