@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cable diagnostics</title><meta name="robots" content="noindex">
+<style>body{font:13px Verdana,sans-serif;margin:12px;background:#0b1e57;color:#fff}a{color:#ffcc00}iframe{border:0;background:#000}
+#box{display:flex;gap:12px;flex-wrap:wrap}table{border-collapse:collapse;font-size:12px;background:#fff;color:#000}td,th{border:1px solid #999;padding:2px 6px}
+.ok{background:#c8f7c5}.bad{background:#ffc9c9}.slow{background:#fff1b8}#sum{font-size:18px;font-weight:bold;margin:8px 0;color:#ffcc00}
+textarea{width:100%;height:120px;font:11px monospace}.pl{display:inline-block;width:160px;height:90px;margin:2px}</style></head>
+<body>
+<h2>Cable diagnostics</h2>
+<p><a href="?mode=chan">Channel pass</a> (tunes every channel in the real app, measures time to PLAYING) &middot;
+<a href="?mode=ids">Program check</a> (plays every program airing in the next <span id="hrs">24</span> h, muted, 6 at a time; lists the ones that error or never play) &middot;
+add <code>&amp;ua=tv</code> / <code>&amp;w=390&amp;h=844</code> to emulate a size.</p>
+<div id="sum">Pick a test above.</div>
+<div id="box"></div>
+<textarea id="out" readonly placeholder="results JSON"></textarea>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search), mode = q.get('mode'), box = document.getElementById('box'), sum = document.getElementById('sum'), out = document.getElementById('out');
+  function done(o, title) { out.value = JSON.stringify(o); document.title = title; sum.textContent = title; }
+  if (mode === 'chan') {
+    var w = +q.get('w') || 960, h = +q.get('h') || 540, f = document.createElement('iframe');
+    f.width = w; f.height = h; f.allow = 'autoplay; encrypted-media; fullscreen'; f.src = './?autostart=1' + (q.get('ua') === 'tv' ? '&tv=1' : '');
+    box.appendChild(f);
+    var tb = document.createElement('table'); tb.innerHTML = '<tr><th>#</th><th>Channel</th><th>PLAYING after</th><th>errors</th><th>muted</th></tr>'; box.appendChild(tb);
+    var res = [], wait = (+q.get('wait') || 12) * 1000;
+    var iv = setInterval(function () { var W = f.contentWindow; if (W && W.CABLE && W.CABLE.S.started) { clearInterval(iv); setTimeout(function () { run(W); }, 3000); } }, 300);
+    function cur(W) { try { var y = W.CABLE.YTP(); return { st: y.getPlayerState(), t: y.getCurrentTime(), m: y.isMuted() }; } catch (e) { return { st: null, t: 0, m: null }; } }
+    function run(W) {
+      var CH = W.CABLE.CH, i = +(q.get('from') || 0), lim = +(q.get('n') || CH.length);
+      (function next() {
+        if (i >= Math.min(CH.length, lim)) {
+          var ok = res.filter(function (r) { return r.t != null && r.t <= 5; }).length;
+          return done(res, 'CHANNELS ' + ok + '/' + res.length + ' playing within 5 s (' + Math.round(100 * ok / res.length) + '%)');
+        }
+        var c = CH[i], idx = i++, t0 = Date.now(), L = W.CABLE_LOG, l0 = L.length, last = null, r = { n: c.n, name: c.name, t: null, err: [], muted: null };
+        W.CABLE.tune(idx);
+        var p = setInterval(function () {
+          var el = Date.now() - t0, playing = false;
+          if (c.hls) { var v = W.document.getElementById('hls'); if (v && !v.paused && v.currentTime > 0) { if (last != null && v.currentTime > last + 0.2) playing = true; last = v.currentTime; r.muted = v.muted; } }
+          else { var s = cur(W); r.muted = s.m; if (s.st === 1) { if (last != null && s.t > last + 0.15) playing = true; last = s.t; } }
+          for (var k = l0; k < L.length; k++) if (L[k][0] === 'error' && r.err.indexOf(L[k][1]) < 0) r.err.push(L[k][1]);
+          if (playing || el > wait) {
+            clearInterval(p); if (playing) r.t = Math.round(el / 100) / 10; res.push(r);
+            var tr = document.createElement('tr'); tr.className = r.t == null ? 'bad' : r.t > 5 ? 'slow' : 'ok';
+            tr.innerHTML = '<td>' + r.n + '</td><td>' + c.name + '</td><td>' + (r.t == null ? 'NEVER (' + wait / 1000 + ' s)' : r.t + ' s') + '</td><td>' + r.err.join(',') + '</td><td>' + r.muted + '</td>';
+            tb.appendChild(tr); sum.textContent = 'running ' + res.length + '/' + Math.min(CH.length, lim) + '...';
+            setTimeout(next, 600);
+          }
+        }, 250);
+      })();
+    }
+  } else if (mode === 'ids') {
+    var HRS = +(q.get('hrs') || 24); document.getElementById('hrs').textContent = HRS;
+    var f2 = document.createElement('iframe'); f2.width = 320; f2.height = 180; f2.src = './?nocache=1'; box.appendChild(f2);
+    var iv2 = setInterval(function () { var W = f2.contentWindow; if (W && W.CABLE && W.CABLE.CH && W.CABLE.CH.length) { clearInterval(iv2); collect(W); } }, 300);
+    function collect(W) {
+      var C = W.CABLE, t0 = Date.now() / 1000, ids = {}, list = [];
+      C.CH.forEach(function (c) { if (c.hls || !c.seq) return; var p = C.at(c, t0), n = 0; while (p.start < t0 + HRS * 3600 && n++ < 400) { var vid = W.CABLE.V(p.i).id; if (!ids[vid]) { ids[vid] = c.n; list.push(vid); } p = C.nextOf(c, p); } });
+      f2.remove(); sum.textContent = list.length + ' programs to check...'; check(list, ids);
+    }
+    function check(list, chOf) {
+      var tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(tag);
+      var bad = [], okN = 0, i = 0, PAR = +(q.get('par') || 6), T = (+q.get('t') || 10) * 1000, slots = [];
+      window.onYouTubeIframeAPIReady = function () { for (var s = 0; s < PAR; s++) mk(s); };
+      function mk(s) {
+        var d = document.createElement('div'), el = document.createElement('div'); d.className = 'pl'; d.appendChild(el); box.appendChild(d);
+        var slot = { id: null, timer: null }; slots[s] = slot;
+        slot.p = new YT.Player(el, { width: 160, height: 90, playerVars: { autoplay: 1, mute: 1, controls: 0, playsinline: 1, origin: location.origin },
+          events: { onReady: function () { nextId(slot); }, onStateChange: function (e) { if (e.data === 1 && slot.id) { okN++; fin(slot); } },
+            onError: function (e) { if (slot.id) { bad.push([slot.id, e.data, chOf[slot.id]]); fin(slot); } } } });
+      }
+      function fin(slot) { clearTimeout(slot.timer); slot.id = null; sum.textContent = 'checked ' + (okN + bad.length) + '/' + list.length + ' - bad ' + bad.length; setTimeout(function () { nextId(slot); }, 150); }
+      function nextId(slot) {
+        if (i >= list.length) { if (slots.every(function (s) { return !s.id; })) done({ checked: list.length, ok: okN, bad: bad }, 'PROGRAMS checked ' + list.length + ' bad ' + bad.length + ': ' + bad.map(function (b) { return b[0] + ':' + b[1]; }).join(' ')); return; }
+        slot.id = list[i++]; try { slot.p.mute(); slot.p.loadVideoById({ videoId: slot.id, startSeconds: 30 }); } catch (e) {}
+        slot.timer = setTimeout(function () { if (slot.id) { bad.push([slot.id, 'timeout', chOf[slot.id]]); fin(slot); } }, T);
+      }
+    }
+  }
+})();
+</script>
+</body></html>
