@@ -119,15 +119,32 @@
     if (!o.keep || !S.picOK) { S.picOK = false; cover("tune"); }
     S.ccFor = null; clearTimeout(tick.t); tick.t = setTimeout(tick, 250); refocus();
   }
+  // Start-up watchdog for a freshly loaded program (2026-11-19, Chase: never give up on a program because of YouTube pre-roll ads).
+  // Ads and buffering are healthy: an ad shows the player at once and we keep waiting; buffering just waits. A program is only skipped on a real
+  // player error (onError: 100/101/150/5/2 -> fail) or when NOTHING happens - no picture progress, no ad, no buffering - for 60 s
+  // (90 s hard cap with no progress at all, 6 min cap on one ad break). When the program itself starts after an ad it is seeked to the
+  // schedule offset (live channels), so every viewer stays in sync.
   function tick() {
     var j = job; if (!j || j.done) return;
-    var p = PL[j.n], st = -2, ct = 0; try { st = p.getPlayerState(); ct = p.getCurrentTime() || 0; } catch (e) {}
-    var el = Date.now() - j.t0, moving = j.last != null && ct > j.last + 0.08; j.last = ct;
-    if (st === 1 && moving && Math.abs(ct - j.start) < 30 + el / 1000) return live(j, false);
-    if (st !== 1 && moving && Math.abs(ct - j.start) > 4 && !j.ad) { j.ad = true; LOG.push(["ad", j.id, Date.now()]); live(j, true); }
-    if (!j.kick && el > 2500 && !moving) { j.kick = true; try { p.mute(); p.playVideo(); } catch (e) {} }
-    if (!j.ad && el > 6500 && !NOWD) return fail(j, "no-picture");
-    if (j.ad && el > 150000) return fail(j, "ad-stall");
+    var p = PL[j.n], st = -2, ct = 0, tn = Date.now(); try { st = p.getPlayerState(); ct = p.getCurrentTime() || 0; } catch (e) {}
+    var el = tn - j.t0, moving = j.last != null && ct > j.last + 0.08; j.last = ct;
+    if (j.lastMove == null) j.lastMove = j.t0;
+    if (moving) j.lastMove = tn;
+    if (st === 3) j.lastBuf = tn;
+    var want = j.start + el / 1000;   // where the program should be now
+    if (st === 1 && moving && (Math.abs(ct - j.start) < 30 + el / 1000 || (j.start < 5 && !j.ad))) return live(j, false);
+    if (moving && Math.abs(ct - j.start) > 4 && Math.abs(ct - want) > 4) { // something else is playing = a pre-roll ad
+      if (!j.ad) { j.ad = tn; LOG.push(["ad", j.id, tn]); live(j, true); }
+      j.adSeen = tn;
+    }
+    if ((!moving && el > 2500 && !j.kick) || (!moving && (st === 2 || st === 5 || st === -1) && el > 4000 && tn - (j.kickAt || 0) > 10000)) { j.kick = true; j.kickAt = tn; try { p.mute(); p.playVideo(); } catch (e) {} }
+    if (!S.picOK && !j.ad && el > 8000 && !j.stby) { j.stby = 1; cover("tune", "Please stand by\u2026"); }
+    var idle = tn - j.lastMove, bufRecent = j.lastBuf && tn - j.lastBuf < 4000, adRecent = j.adSeen && tn - j.adSeen < 4000;
+    if (!NOWD) {
+      if (idle > 60000 && !bufRecent && !adRecent) return fail(j, "no-picture");
+      if (idle > 90000) return fail(j, "no-picture");
+      if (j.ad && tn - j.ad > 360000) return fail(j, "ad-stall");
+    }
     tick.t = setTimeout(tick, 250);
   }
   function cut(n) {
@@ -140,6 +157,10 @@
     sound();
     if (isAd) return;
     j.ok = j.done = true; j.okAt = Date.now(); LOG.push(["playing", j.id, j.okAt - j.t0, j.okAt]);
+    if (j.ad && !j.o.vod && !S.vod) { // the ad ate into the slot: jump to where the schedule is now
+      var want = j.start + (j.okAt - j.t0) / 1000, p = PL[j.n], dur = 0, ct = 0; try { dur = p.getDuration() || 0; ct = p.getCurrentTime() || 0; } catch (e) {}
+      if (want - ct > 3 && (!dur || want < dur - 5)) { try { p.seekTo(want, true); } catch (e) {} LOG.push(["resync", j.id, Math.round(ct), Math.round(want), j.okAt]); }
+    }
     if (S.ccFor !== S.playing) { S.ccFor = S.playing; applyCC(); setTimeout(applyCC, 1500); }
     refocus();
   }
@@ -322,6 +343,20 @@
     if (!S.started || S.vod) return; var c = CH[S.ch]; if (!c || c.hls) return;
     if (S.override) { if (now() >= S.override.end) { S.override = null; tune(S.ch, { quiet: true, keepLast: true }); } return; }
     var p = at(c, now()); if (VV[p.i][0] !== S.playing && !S.bad[VV[p.i][0]]) tune(S.ch, { quiet: true, keepLast: true });
+  }, 5000);
+  // schedule drift (a mid-roll ad, a long buffer, an ad we took for the program): once the program has played continuously for two
+  // checks in a row and sits > 12 s behind (or > 20 s ahead of) the schedule, seek it back on time. A jump in currentTime (ad start/end) resets the check.
+  setInterval(function () {
+    var dr = S.drift || (S.drift = {});
+    if (!S.started || S.vod || !ytReady || !S.picOK || (job && !job.done) || $("#ytwrap").classList.contains("ad")) { dr.id = null; return; }
+    var c = CH[S.ch]; if (!c || c.hls) { dr.id = null; return; }
+    var p = S.override && S.override.ch === S.ch ? S.override : at(c, now()); if (VV[p.i][0] !== S.playing) { dr.id = null; return; }
+    var st = -2, ct = 0, tn = Date.now(); try { st = YTP.getPlayerState(); ct = YTP.getCurrentTime() || 0; } catch (e) { return; }
+    if (st !== 1) { dr.id = null; return; }
+    var cont = dr.id === S.playing && Math.abs(ct - (dr.ct + (tn - dr.t) / 1000)) < 2.5;
+    dr.ok = cont ? (dr.ok || 0) + 1 : 0; dr.id = S.playing; dr.ct = ct; dr.t = tn;
+    var want = now() - p.start, d = want - ct;
+    if (dr.ok >= 2 && (d > 12 || d < -20) && want > 0 && want < VV[p.i][2] - 5) { try { YTP.seekTo(want, true); } catch (e) {} LOG.push(["resync", S.playing, Math.round(ct), Math.round(want), tn]); dr.ok = 0; dr.id = null; }
   }, 5000);
 
   // ---------- banner ----------
@@ -1081,6 +1116,7 @@
   $("#unmute").addEventListener("click", function (e) { e.stopPropagation(); unmute(); });
 
   function powerOn() {
+    if (W.CABLE_GATE && W.CABLE_GATE.locked) return; // launch gate (gate.js): nothing plays before launch
     if (S.started || !CH.length) return; S.started = true; S.soundOK = true; $("#power").hidden = true;
     var last = +LS.getItem("cable_ch"), c = CH.filter(function (c) { return c.n === last; })[0] || CH[0];
     setMode("tv"); tune(c.idx); showBanner(6000);
@@ -1097,6 +1133,7 @@
     var b = $("#pwbtn"); b.disabled = false; if (IS_TV) b.classList.add("focus"); try { b.focus(); } catch (e) {}
     ccUI(); recUI();
     W.CABLE = { S: S, CH: CH, at: at, tune: tune, key: key, V: V, openOD: openOD, openGuide: openGuide, openDVR: openDVR, dvr: dvr, dvrEntries: dvrEntries, G: G, dlg: function () { return DLG; }, nextOf: nextOf, VIDX: VIDX, YTP: function () { return YTP; }, job: function () { return job; }, search: searchItems, push: push, screens: { srcScreen: srcScreen, WWFK: WWFK, typeScreen2: typeScreen, peopleScreen: peopleScreen, genresScreen: genresScreen, decadeScreen: decadeScreen, typeScreen: typeScreen, networksScreen: networksScreen, azScreen: azScreen, searchScreen: searchScreen } };
-    if (/[?&]autostart=1/.test(location.search)) powerOn();
+    W.addEventListener("cable-unlock", function () { try { if (!S.started) $("#pwbtn").focus(); } catch (e) {} });
+    if (/[?&]autostart=1/.test(location.search)) { if (W.CABLE_GATE && W.CABLE_GATE.locked) W.addEventListener("cable-unlock", function () { powerOn(); }); else powerOn(); }
   }).catch(function (e) { $(".pw-load").textContent = "Couldn't load the lineup - check your connection."; });
 })();

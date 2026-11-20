@@ -21,7 +21,7 @@ add <code>&amp;ua=tv</code> / <code>&amp;w=390&amp;h=844</code> to emulate a siz
     var w = +q.get('w') || 960, h = +q.get('h') || 540, f = document.createElement('iframe');
     f.width = w; f.height = h; f.allow = 'autoplay; encrypted-media; fullscreen'; f.src = './?autostart=1' + (q.get('ua') === 'tv' ? '&tv=1' : '');
     box.appendChild(f);
-    var tb = document.createElement('table'); tb.innerHTML = '<tr><th>#</th><th>Channel</th><th>PLAYING after</th><th>errors</th><th>muted</th></tr>'; box.appendChild(tb);
+    var tb = document.createElement('table'); tb.innerHTML = '<tr><th>#</th><th>Channel</th><th>PLAYING after</th><th>errors</th><th>muted</th><th>pre-roll</th><th>schedule drift</th></tr>'; box.appendChild(tb);
     var res = [], wait = (+q.get('wait') || 12) * 1000;
     var iv = setInterval(function () { var W = f.contentWindow; if (W && W.CABLE && W.CABLE.S.started) { clearInterval(iv); setTimeout(function () { run(W); }, 3000); } }, 300);
     function cur(W) { try { var y = W.CABLE.YTP(); return { st: y.getPlayerState(), t: y.getCurrentTime(), m: y.isMuted() }; } catch (e) { return { st: null, t: 0, m: null }; } }
@@ -30,7 +30,8 @@ add <code>&amp;ua=tv</code> / <code>&amp;w=390&amp;h=844</code> to emulate a siz
       (function next() {
         if (i >= Math.min(CH.length, lim)) {
           var ok = res.filter(function (r) { return r.t != null && r.t <= 5; }).length, pic = res.filter(function (r) { return (r.t != null && r.t <= 5) || (r.pic != null && r.pic <= 5); }).length;
-          return done(res, 'CHANNELS ' + ok + '/' + res.length + ' playing within 5 s (' + Math.round(100 * ok / res.length) + '%); picture (program or YouTube ad) within 5 s: ' + pic + '/' + res.length);
+          var prog = res.filter(function (r) { return r.t != null; }).length, ads = res.filter(function (r) { return r.ad; }).length;
+          return done(res, 'CHANNELS ' + ok + '/' + res.length + ' playing within 5 s (' + Math.round(100 * ok / res.length) + '%); picture (program or YouTube ad) within 5 s: ' + pic + '/' + res.length + '; program playing within ' + wait / 1000 + ' s: ' + prog + '/' + res.length + ' (' + ads + ' after a pre-roll ad)');
         }
         var c = CH[i], idx = i++, t0 = Date.now(), L = W.CABLE_LOG, l0 = L.length, last = null, r = { n: c.n, name: c.name, t: null, err: [], muted: null };
         W.CABLE.tune(idx);
@@ -42,10 +43,13 @@ add <code>&amp;ua=tv</code> / <code>&amp;w=390&amp;h=844</code> to emulate a siz
             if (q.get('trace')) { var tk = Math.floor(el / 1000); if (tk !== r._tk) { r._tk = tk; (r.tr = r.tr || []).push(tk + ':' + s.st + '/' + Math.round(s.t) + '/' + du + '/' + lf); } }
             if (s.st === 1) { if (last != null && s.t > last + 0.15) playing = true; last = s.t; } }
           for (var k = l0; k < L.length; k++) if (L[k][0] === 'error' && r.err.indexOf(L[k][1]) < 0) r.err.push(L[k][1]);
+          if (playing && !c.hls && r.t == null) { r.t = Math.round(el / 100) / 10; r.ad = !!(W.CABLE.job() && W.CABLE.job().ad); r.dw = Date.now() + 4000; return; }
+          if (r.dw && Date.now() < r.dw) return;
+          if (r.dw) { try { var S0 = W.CABLE.S, pp = S0.override && S0.override.ch === S0.ch ? S0.override : W.CABLE.at(c, Date.now() / 1000); r.drift = Math.round(((Date.now() / 1000 - pp.start) - W.CABLE.YTP().getCurrentTime()) * 10) / 10; } catch (e) {} playing = true; el = r.t * 1000; }
           if (playing || el > wait) {
-            clearInterval(p); if (playing) r.t = Math.round(el / 100) / 10; res.push(r);
+            clearInterval(p); if (playing && r.t == null) r.t = Math.round(el / 100) / 10; res.push(r);
             var tr = document.createElement('tr'); tr.className = r.t == null ? 'bad' : r.t > 5 ? 'slow' : 'ok';
-            tr.innerHTML = '<td>' + r.n + '</td><td>' + c.name + '</td><td>' + (r.t == null ? 'NEVER (' + wait / 1000 + ' s)' : r.t + ' s') + '</td><td>' + r.err.join(',') + '</td><td>' + r.muted + (r.tr ? '</td><td style="font:10px monospace">' + r.tr.join(' ') : '') + '</td>';
+            tr.innerHTML = '<td>' + r.n + '</td><td>' + c.name + '</td><td>' + (r.t == null ? 'NEVER (' + wait / 1000 + ' s)' : r.t + ' s') + '</td><td>' + r.err.join(',') + '</td><td>' + r.muted + '</td><td>' + (r.ad ? 'ad' : '') + '</td><td>' + (r.drift != null ? r.drift + ' s' : '') + (r.tr ? '</td><td style="font:10px monospace">' + r.tr.join(' ') : '') + '</td>';
             tb.appendChild(tr); sum.textContent = 'running ' + res.length + '/' + Math.min(CH.length, lim) + '...';
             setTimeout(next, 600);
           }
