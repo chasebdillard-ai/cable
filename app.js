@@ -26,7 +26,7 @@
   function vtitle(v) { var sh = v.sh >= 0 ? SHOWS[v.sh].n : ""; return sh ? sh + (v.s || v.e ? " (S" + (v.s || "?") + (v.e ? ", E" + v.e : "") + ")" : "") + ": " + v.t : v.t; }
   // real network logos (Wikimedia Commons / Wikipedia, downloaded into logos/): LIVE.logos[id] = [plate l|d, aspect, mono aspect]
   var SRCLOGO = { AETV: "ae", NCIS: "cbs", CBS: "cbs", FortyEight: "cbs", SixtyMin: "cbs", TwoHalfMen: "cbs", Showtime: "showtime", History: "history", PawnStars: "history",
-    Lifetime: "lifetime", TLC: "tlc", MTVRealityUK: "mtv", MTVVault: "mtv", Discovery: "discovery", Science: "science", NatGeo: "natgeo", COPS: "realcops", TruBlu: "trublu", WWF: "wwf", TheCW: "thecw",
+    Lifetime: "lifetime", TLC: "tlc", TLCAU: "tlc", TLCUK: "tlc", MTVRealityUK: "mtv", MTVVault: "mtv", Discovery: "discovery", Science: "science", NatGeo: "natgeo", COPS: "realcops", TruBlu: "trublu", WWF: "wwf", TheCW: "thecw",
     CWSports: "thecw", Reelz: "reelz", GSN: "gsn", OWN: "own", PBS: "pbs", PBSDocs: "pbs", Starz: "starz", WEtv: "wetv", Oxygen: "oxygen", BET: "bet",
     PokemonTV: "kidswb", Pokemon: "kidswb", RegularShow: "cn", TotalDrama: "cn", AquaTeen: "cn", RickMorty: "cn", PBSKids: "pbskids",
     KUWTK: "e", EEnt: "e", ENews: "e", EInsider: "e", Peacock: "nbcpeacock", NBC: "nbcpeacock",
