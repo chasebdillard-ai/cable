@@ -81,6 +81,18 @@
   function ovProg(o) { return { live: 1, ov: o, i: -1, k: -1, start: o.start, end: o.end }; }
   function ovNow() { var c = CH[S.ch], o = !S.vod && c && !c.hls ? ovFor(c, now()) : null; return o && S.playing === o.vid ? o : null; }
   function ovDrop(o, why) { if (!o) return; S.ovDead[ovKey(o)] = 1; LOG.push(["ovend", o.vid, why, Date.now()]); }
+  // countdown overlay (2026-11-20): override with countdown_from -> upper-right "LIVE IN mm:ss" on that channel until start
+  function cdFor(c, t) { var L = (LIVE && LIVE.ov) || []; for (var j = 0; j < L.length; j++) { var o = L[j]; if (c && o.ch === c.id && o.countdown_from && t >= o.countdown_from && t < o.start && !S.ovDead[ovKey(o)]) return o; } return null; }
+  function cdTick() {
+    var el = $("#ovcd"); if (!el) return; var c = !S.vod && S.started ? CH[S.ch] : null, o = c && !c.hls ? cdFor(c, now()) : null;
+    if (!o) { if (!el.hidden) el.hidden = true; return; }
+    var r = Math.max(0, Math.ceil(o.start - now())), h = Math.floor(r / 3600), m = Math.floor(r % 3600 / 60), sc = r % 60;
+    var txt = (h ? h + ":" + (m < 10 ? "0" : "") : "") + m + ":" + (sc < 10 ? "0" : "") + sc;
+    if (el.dataset.k !== ovKey(o)) { el.dataset.k = ovKey(o); $("img", el).hidden = !o.logo; if (o.logo) $("img", el).src = o.logo; $(".cd-lb", el).textContent = o.cd_label || o.title; }
+    $(".cd-t", el).textContent = txt; el.hidden = false;
+  }
+  setInterval(cdTick, 1000);
+  W.__cableCd = function () { var el = $("#ovcd"); return { shown: !!el && !el.hidden, t: el && $(".cd-t", el).textContent }; };
   W.__cableOv = function () { return { on: ovNow(), dead: S.ovDead }; };
   function nextOf(c, p) { var k = (p.k + 1) % c.seq.length; return { k: k, i: c.seq[k], start: p.end, end: p.end + VV[c.seq[k]][2] }; }
   function progs(c, t0, t1) { if (c.hls) return [{ live: 1, start: t0 - 3600, end: t1 + 3600 }]; var out = [], p = at(c, t0); while (p.start < t1 && out.length < 60) { out.push(p); p = nextOf(c, p); }
@@ -132,7 +144,7 @@
     var sb = 1 - act, p = PL[sb];
     if (job && !job.done) job.done = true;
     var j = job = { id: id, start: Math.max(0, Math.floor(start || 0)), t0: Date.now(), n: sb, ok: false, ad: false, last: null, kick: false, o: o };
-    try { p.mute(); p.loadVideoById(o.live ? { videoId: id } : { videoId: id, startSeconds: j.start }); p.playVideo(); } catch (e) {}
+    try { p.mute(); p.loadVideoById(o.live && !o.ovod ? { videoId: id } : { videoId: id, startSeconds: j.start }); p.playVideo(); } catch (e) {}
     try { PL[act].mute(); } catch (e) {}
     if (!o.keep || !S.picOK) { S.picOK = false; cover("tune"); }
     S.ccFor = null; clearTimeout(tick.t); tick.t = setTimeout(tick, 250); refocus();
@@ -348,7 +360,7 @@
     else {
       var fromHls = !$("#hls").hidden; killHls(); if (fromHls) S.picOK = false;
       var ov = ovFor(c, now());
-      if (ov) { S.playing = ov.vid; LOG.push(["ov", ov.vid, ov.end, Date.now()]); ytLoad(ov.vid, 0, { keep: true, live: true }); }
+      if (ov) { S.playing = ov.vid; var ovo = ov.vod ? Math.max(0, now() - ov.start) : 0; LOG.push(["ov", ov.vid, ov.end, Date.now(), ovo]); ytLoad(ov.vid, ovo, { keep: true, live: true, ovod: !!ov.vod }); }
       else {
       var p = at(c, now()), tries = 0;
       while (S.bad[VV[p.i][0]] && tries++ < 30) p = nextOf(c, p);
@@ -356,6 +368,7 @@
       S.playing = VV[p.i][0]; ytLoad(VV[p.i][0], Math.max(0, now() - p.start), { keep: true });
       }
     }
+    cdTick();
     if (c.hls) { setBug(null, ""); $("#bug").dataset.own = c.id; } else { setBug(c.id, c.call); $("#bug").dataset.own = ""; } // live feeds already burn in their own bug
     if (!o.quiet || S.mode === "tv") { if (S.mode === "tv") showBanner(); }
     if (S.mode === "guide") { guideInfo(); gCur(); }
@@ -419,9 +432,9 @@
     } else if (ovNow()) {
       var o = ovNow(), na = at(c, o.end), nav = V(na.i);
       $(".bn-title", b).textContent = o.title;
-      $(".bn-sub", b).textContent = "LIVE  \u00b7  until " + hm(o.end) + "  \u00b7  " + (o.src || c.name);
-      $(".bn-bar i", b).style.width = "100%";
-      $(".bn-next", b).innerHTML = "<b>LIVE</b> &middot; <b>Next " + hm(o.end) + ":</b> " + esc(nav.sh >= 0 ? SHOWS[nav.sh].n + " - " + nav.t : nav.t);
+      $(".bn-sub", b).textContent = o.vod ? hm(o.start) + " - " + hm(o.end) + "  \u00b7  Full Event" + (o.yr ? " (" + o.yr + ")" : "") + "  \u00b7  " + (o.src || c.name) : "LIVE  \u00b7  until " + hm(o.end) + "  \u00b7  " + (o.src || c.name);
+      $(".bn-bar i", b).style.width = o.vod ? Math.min(100, Math.max(0, (now() - o.start) / (o.end - o.start) * 100)) + "%" : "100%";
+      $(".bn-next", b).innerHTML = (o.vod ? "<b>PREMIERE</b>" : "<b>LIVE</b>") + " &middot; <b>Next " + hm(o.end) + ":</b> " + esc(nav.sh >= 0 ? SHOWS[nav.sh].n + " - " + nav.t : nav.t);
     } else {
       var p = S.override && S.override.ch === S.ch ? S.override : at(c, now()), v = V(p.i), n = nextOf(c, p);
       $(".bn-title", b).textContent = v.sh >= 0 ? SHOWS[v.sh].n : v.t;
@@ -504,7 +517,7 @@
       var a = Math.max(p.start, G.w0), b = Math.min(p.end, w1), L = (a - G.w0) / wl * 100, Wd = (b - a) / wl * 100;
       if (Wd <= 0) return;
       var label, sub, cls = "", rec = "";
-      if (p.ov) { label = p.ov.title; sub = "LIVE \u00b7 " + (p.ov.src || c.name); cls = " live ovl"; }
+      if (p.ov) { label = p.ov.title; sub = (p.ov.vod ? "PREMIERE \u00b7 " : "LIVE \u00b7 ") + (p.ov.src || c.name); cls = p.ov.vod ? " ovl ovv" : " live ovl"; }
       else if (p.live) { label = c.name + " - Live Feed"; sub = c.tag; cls = " live"; }
       else { var v = V(p.i); label = v.sh >= 0 ? SHOWS[v.sh].n : v.t; sub = v.sh >= 0 ? v.t : TYPEN[v.ty] + (v.yr ? " (" + v.yr + ")" : ""); if (v.ty === "M") cls = " mv"; rec = recMark(c, p); }
       cells += '<div class="g-cell' + cls + (rec ? " recd" : "") + '" data-r="' + r + '" data-t="' + (p.live && !p.ov ? G.w0 : p.start) + '" data-e="' + (p.live && !p.ov ? w1 : p.end) + '" style="left:' + L + "%;width:" + Wd + '%">' +
@@ -577,7 +590,7 @@
     $(".g-clock").textContent = clock();
     var sp = selProg(); if (!sp) return; var c = sp.c, p = sp.p;
     if (c.hls) { $(".g-ititle").textContent = c.name + " - Live"; $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  LIVE"; $(".g-idesc").textContent = c.tag + ". Real live network feed. Full schedule at " + (c.sched || "").replace(/^https?:\/\//, "") + "."; return; }
-    if (p.ov) { $(".g-ititle").textContent = p.ov.title; $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  " + hm(p.start) + " - " + hm(p.end) + "  \u00b7  LIVE"; $(".g-idesc").textContent = "Live now from " + (p.ov.src || c.name) + ". Free official live stream; " + c.name + "'s regular schedule resumes at " + hm(p.end) + "."; return; }
+    if (p.ov) { $(".g-ititle").textContent = p.ov.title; $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  " + hm(p.start) + " - " + hm(p.end) + "  \u00b7  " + (p.ov.vod ? "PREMIERE" : "LIVE"); $(".g-idesc").textContent = p.ov.vod ? "Special presentation: the full event from " + (p.ov.src || c.name) + ", from the opening bell. " + c.name + "'s regular schedule resumes at " + hm(p.end) + "." : "Live now from " + (p.ov.src || c.name) + ". Free official live stream; " + c.name + "'s regular schedule resumes at " + hm(p.end) + "."; return; }
     var v = V(p.i), sh = v.sh >= 0 ? SHOWS[v.sh] : null;
     $(".g-ititle").textContent = sh ? sh.n + ": " + v.t : v.t;
     $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  " + hm(p.start) + " - " + hm(p.end) + "  \u00b7  " + (v.s ? "S" + v.s + (v.e ? " E" + v.e : "") + "  \u00b7  " : "") + TYPEN[v.ty] + (v.yr ? " \u00b7 " + v.yr : "");
