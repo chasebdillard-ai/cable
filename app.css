@@ -302,6 +302,11 @@ html.tv .bn-act:after{content:"OK = MENU";display:block;font-size:10px;font-weig
 /* scheduled-premiere countdown (2026-11-20), upper-right of the picture, clear of the bottom-right bug */
 #ovcd{position:absolute;z-index:3;top:max(8px,3.2%);right:max(8px,2.6%);display:flex;align-items:center;gap:.5em;padding:.35em .6em .35em .4em;border-radius:.55em;background:rgba(0,0,0,.62);border:1px solid rgba(255,215,90,.55);color:#fff;font:700 clamp(10px,1.5vw,22px)/1.15 Arial,Helvetica,sans-serif;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.5);max-width:46%}
 #ovcd[hidden]{display:none}
+#ovpr{position:absolute;z-index:3;top:max(8px,3.2%);right:max(8px,2.6%);display:flex;align-items:center;gap:.6em;padding:.45em .7em .45em .45em;border-radius:.55em;background:rgba(0,0,0,.62);border:1px solid rgba(255,215,90,.55);color:#fff;font:700 14px/1.2 Arial,Helvetica,sans-serif;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.5);max-width:58%}
+#ovpr[hidden]{display:none}
+#ovpr img{display:block;flex:none;background:#fff;border-radius:3px;image-rendering:pixelated}
+#ovpr .pr-t{color:#ffd75a;letter-spacing:.02em}
+#ovpr .pr-u{font-weight:400;font-size:.8em;opacity:.9;margin-top:.25em}
 #ovcd img{height:2.9em;width:auto;max-width:5.5em;object-fit:contain;display:block;filter:drop-shadow(0 0 2px rgba(0,0,0,.9))}
 #ovcd img[hidden]{display:none}
 #ovcd .cd-hd{color:#ffd75a;letter-spacing:.04em;white-space:nowrap}

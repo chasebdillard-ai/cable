@@ -92,6 +92,19 @@
     $(".cd-t", el).textContent = txt; el.hidden = false;
   }
   setInterval(cdTick, 1000);
+  // corner promo + QR (2026-11-20): live.json pr [{ch,start,end,text,qr_url,qr}] -> #ovpr upper-right of the picture (same spot/style as #ovcd), hidden while #ovcd shows.
+  // QR edge = 11 % of the picture width (min 48 px, max 176 px) so it scans from across the room on a TV and stays small on phones / guide preview.
+  function prFor(c, t) { var L = (LIVE && LIVE.pr) || []; for (var j = 0; j < L.length; j++) { var p = L[j]; if (c && p.ch === c.id && t >= p.start && t < p.end) return p; } return null; }
+  function prTick() {
+    var el = $("#ovpr"); if (!el) return; var cd = $("#ovcd"), c = !S.vod && S.started ? CH[S.ch] : null, p = c && (!cd || cd.hidden) ? prFor(c, now()) : null;
+    if (!p) { if (!el.hidden) el.hidden = true; return; }
+    var k = p.ch + ":" + p.start + ":" + p.qr; if (el.dataset.k !== k) { el.dataset.k = k; $("img", el).src = p.qr; $("img", el).alt = p.qr_url; $(".pr-t", el).textContent = p.text; $(".pr-u", el).textContent = p.qr_url.replace(/^https?:\/\//, "").replace(/\/$/, ""); }
+    var sc = $("#screen"), w = sc ? sc.clientWidth : 640, q = Math.round(Math.min(176, Math.max(48, w * 0.11)));
+    if (el.dataset.q !== String(q)) { el.dataset.q = String(q); $("img", el).style.width = $("img", el).style.height = q + "px"; el.style.fontSize = Math.round(Math.max(10, Math.min(24, q * 0.13))) + "px"; }
+    el.hidden = false;
+  }
+  setInterval(prTick, 1000);
+  W.__cablePr = function () { var el = $("#ovpr"), i = el && $("img", el); return { shown: !!el && !el.hidden, text: el && $(".pr-t", el).textContent, qr: i && i.getAttribute("src"), px: i && i.clientWidth }; };
   W.__cableCd = function () { var el = $("#ovcd"); return { shown: !!el && !el.hidden, t: el && $(".cd-t", el).textContent }; };
   W.__cableOv = function () { return { on: ovNow(), dead: S.ovDead }; };
   function nextOf(c, p) { var k = (p.k + 1) % c.seq.length; return { k: k, i: c.seq[k], start: p.end, end: p.end + VV[c.seq[k]][2] }; }
@@ -368,7 +381,7 @@
       S.playing = VV[p.i][0]; ytLoad(VV[p.i][0], Math.max(0, now() - p.start), { keep: true });
       }
     }
-    cdTick();
+    cdTick(); prTick();
     if (c.hls) { setBug(null, ""); $("#bug").dataset.own = c.id; } else { setBug(c.id, c.call); $("#bug").dataset.own = ""; } // live feeds already burn in their own bug
     if (!o.quiet || S.mode === "tv") { if (S.mode === "tv") showBanner(); }
     if (S.mode === "guide") { guideInfo(); gCur(); }
