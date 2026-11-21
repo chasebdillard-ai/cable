@@ -326,3 +326,7 @@ html.tv .bn-act:after{content:"OK = MENU";display:block;font-size:10px;font-weig
 #cctk.live img{width:7em}
 #cctk.live .tk-lb,#cctk.live .tk-t{display:none}
 #cctk.live .tk-live{display:inline-block}
+
+/* 2026-11-21 web-page channels (82 Weatherscan): full-screen iframe; taps go to the page (its one-time setup screen needs a tap) */
+#web{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;border:0;background:#000;z-index:1}
+#screen.webon #tap{pointer-events:none}

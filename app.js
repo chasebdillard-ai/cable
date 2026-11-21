@@ -428,6 +428,13 @@
     if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
     var v = $("#hls"); try { v.onerror = null; v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} v.hidden = true;
   }
+  // 2026-11-21 (Chase): web-page channels (c.web = URL), e.g. 82 Weatherscan. hls:[] keeps every schedule/YouTube path treating it as a live feed.
+  function killWeb() { var f = $("#web"); if (!f || f.hidden) return; f.hidden = true; f.src = "about:blank"; $("#screen").classList.remove("webon"); }
+  function tuneWeb(c) {
+    killHls(); if (job) job.done = true; job = null; try { PL[act].mute(); } catch (e) {} ytStop();
+    var f = $("#web"); if (f.getAttribute("src") !== c.web) f.src = c.web;
+    f.hidden = false; $("#screen").classList.add("webon"); S.picOK = true; cover(null); $("#snow").hidden = true;
+  }
   function tuneHls(c) {
     var hadYT = S.picOK && $("#hls").hidden; killHls(); if (job) job.done = true; job = null; try { PL[act].mute(); } catch (e) {}
     if (!hadYT) { ytStop(); cover("tune"); }
@@ -475,8 +482,9 @@
     LS.setItem("cable_chid", c.id); // saved by channel id (2026-11-20 guide renumber); numbers can change, ids never do
     $("#vodbar").hidden = true; $("#snow").hidden = true;
     if (!o.quiet) flash();   // cable-box channel change: a quick burst of static, previous picture held until the new one plays
-    if (c.hls) { S.playing = "hls:" + c.id; tuneHls(c); }
-    else {
+    if (c.web) { S.playing = "web:" + c.id; tuneWeb(c); }
+    else if (c.hls) { killWeb(); S.playing = "hls:" + c.id; tuneHls(c); }
+    else { killWeb();
       var fromHls = !$("#hls").hidden; killHls(); if (fromHls) S.picOK = false;
       if (!o.quiet) Object.keys(S.ovDead).forEach(function (k) { if (k.indexOf(c.id + ":live:") === 0) delete S.ovDead[k]; }); // weekly live slot: its fallback lasts until the next tune
       var ov = ovFor(c, now());

@@ -5,7 +5,7 @@
 <script src="gate.js?v=7e1be65d"></script>
 <script src="donate.js?v=869e0517"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="cable-cat" content="catalog.json?v=4b9daf7c"><meta name="cable-live" content="live.json?v=fb648c79"><!-- build.py stamps the catalog hash so catalog.json and live.json always come from the same build -->
+<meta name="cable-cat" content="catalog.json?v=4b9daf7c"><meta name="cable-live" content="live.json?v=1cffb89c"><!-- build.py stamps the catalog hash so catalog.json and live.json always come from the same build -->
 <meta name="theme-color" content="#06164a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -32,7 +32,7 @@
 <link rel="apple-touch-startup-image" href="splash/launch-1668x2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
 <link rel="apple-touch-startup-image" href="splash/launch-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
 <link rel="apple-touch-startup-image" href="splash/launch-1488x2266.png" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
-<link rel="stylesheet" href="app.css?v=acf1d20a">
+<link rel="stylesheet" href="app.css?v=a837a69e">
 <link rel="preconnect" href="https://www.youtube.com">
 <link rel="preconnect" href="https://i.ytimg.com">
 </head>
@@ -41,6 +41,7 @@
   <div id="screen" class="screen">
     <div id="ytwrap"><div class="ytp on" id="yp0"><div id="yt0"></div></div><div class="ytp" id="yp1"><div id="yt1"></div></div></div>
     <video id="hls" playsinline webkit-playsinline preload="auto" hidden></video>
+    <iframe id="web" hidden title="Live channel" allow="autoplay; geolocation; fullscreen" referrerpolicy="no-referrer-when-downgrade"></iframe>
     <div id="cover" hidden><div class="cv-in"><div class="cv-num"></div><div class="cv-logo"></div><div class="cv-txt">Tuning&hellip;</div></div></div>
     <div id="tunefx" hidden></div>
     <div id="snow" hidden><div class="snowtxt"><b>Technical difficulties</b><span>Please stand by</span></div></div>
@@ -146,6 +147,6 @@
     </div>
   </div>
 </div>
-<script src="app.js?v=5116d4c5"></script>
+<script src="app.js?v=a0b26e94"></script>
 </body>
 </html>
