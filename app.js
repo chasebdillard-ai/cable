@@ -77,21 +77,117 @@
   // player reports the video ended / errors 100/101/150/2/5 (S.ovDead, this session), the channel falls back to its normal schedule.
   S.ovDead = {};
   function ovKey(o) { return o.ch + ":" + o.vid + ":" + o.start; }
-  function ovFor(c, t) { var L = (LIVE && LIVE.ov) || []; for (var j = 0; j < L.length; j++) { var o = L[j]; if (c && o.ch === c.id && t >= o.start && t < o.end && !S.ovDead[ovKey(o)]) return o; } return null; }
+  // ---------- weekly appointment blocks (live.json "wk", 2026-11-20, Wrestling Network 79) ----------
+  // Slot = {ch, dow, time "HH:MM", tz America/New_York, anchor "YYYY-MM-DD", rot:[{promo,title,pool:[vid]}] | live:{channel,dur}}. Occurrences are computed here
+  // (US Eastern DST rule: 2nd Sun of March 2:00 -> 1st Sun of Nov 2:00) and behave exactly like overrides (ovFor / guide / banner / countdown / early fallback).
+  // VOD: week n since anchor -> rot[n % R], episode pool[floor(n / R) % len]; plays from 0:00 at start, real length. live: embed/live_stream?channel=... at the live edge.
+  function nthSun(y, m, k) { var d1 = new Date(Date.UTC(y, m, 1)).getUTCDay(); return 1 + (7 - d1) % 7 + 7 * (k - 1); }
+  function etDST(u) { var y = new Date(u * 1000).getUTCFullYear(); return u >= Date.UTC(y, 2, nthSun(y, 2, 2), 7) / 1000 && u < Date.UTC(y, 10, nthSun(y, 10, 1), 6) / 1000; }
+  function etOff(u) { return etDST(u) ? -4 : -5; }
+  function etWall(y, m, d, h, mi) { var g = Date.UTC(y, m, d, h, mi) / 1000 + 5 * 3600; return etDST(g - 3600) ? g - 3600 : g; } // wall clock ET -> unix
+  // block slot (w.block seconds): full shows back to back from a running pointer (a show is added only if it fits, the first always), tail padded from r.pad, hard stop.
+  // Pointers advance by what each earlier week used, so nothing repeats until a pool cycles (computed from week 0, cached).
+  function wkBlock(w, n) {
+    var C = wkBlock.c || (wkBlock.c = {}), cc = C[w.id] || (C[w.id] = { n: -1, ps: 0, pp: 0, last: null }), r = w.rot[0], pad = r.pad || [];
+    if (cc.n > n) { cc.n = -1; cc.ps = 0; cc.pp = 0; }
+    while (cc.n < n) {
+      var it = [], tt = 0, k = 0;
+      while (k < r.pool.length) { var v = r.pool[(cc.ps + k) % r.pool.length], dv = VV[VIDX[v]][2]; if (it.length && tt + dv > w.block) break; it.push(v); tt += dv; k++; if (tt >= w.block) break; }
+      cc.ps += k; var q = 0;
+      while (tt < w.block && pad.length && q < pad.length) { var pv = pad[(cc.pp + q) % pad.length]; it.push(pv); tt += VV[VIDX[pv]][2]; q++; }
+      cc.pp += q; cc.n++; cc.last = it;
+    }
+    return cc.last;
+  }
+  function wkOcc(t) {
+    var W0 = (LIVE && LIVE.wk) || []; if (!W0.length) return [];
+    var L0 = new Date((t + etOff(t) * 3600) * 1000), key = L0.getUTCFullYear() + "-" + L0.getUTCMonth() + "-" + L0.getUTCDate() + "/" + (S.ovEndRev || 0);
+    if (wkOcc.k === key) return wkOcc.v;
+    var grp = [], one = (LIVE && LIVE.ov) || [];
+    for (var dd = -2; dd <= 2; dd++) {
+      var x = new Date(Date.UTC(L0.getUTCFullYear(), L0.getUTCMonth(), L0.getUTCDate() + dd)), dow = x.getUTCDay();
+      W0.forEach(function (w) {
+        if (w.dow !== dow) return; var a = w.anchor.split("-"), days = Math.round((x.getTime() - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 864e5); if (days < 0) return;
+        var n = Math.floor(days / 7), hm0 = w.time.split(":"), st = etWall(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate(), +hm0[0], +hm0[1]), list = [];
+        var cdl = " \u00b7 " + ((+hm0[0] % 12) || 12) + (+hm0[1] ? ":" + hm0[1] : "") + (+hm0[0] < 12 ? " AM" : " PM") + " ET";
+        if (w.live) list.push({ ch: w.ch, vid: "live:" + w.live.channel, ls: w.live.channel, title: w.title, src: w.src, start: st, end: st + w.live.dur, cd_pre: w.cd_pre });
+        else {
+          var r = w.rot[n % w.rot.length], ids, t1 = st;
+          if (w.block) ids = wkBlock(w, n); else ids = [r.pool[Math.floor(n / w.rot.length) % r.pool.length]];
+          ids.forEach(function (vid, j) { var vi = VIDX[vid]; if (vi == null) return; var e1 = t1 + VV[vi][2];
+            if (w.block) e1 = Math.min(e1, st + w.block);
+            list.push({ ch: w.ch, vid: vid, title: r.title, ep: VV[vi][1], src: r.promo, start: t1, end: e1, vod: true, ty: VV[vi][7], ei: w.block ? null : Math.floor(n / w.rot.length) % r.pool.length, pl: r.pool.length, cd_pre: r.title.toUpperCase() + " IN", part: j }); t1 = e1; });
+        }
+        if (!list.length) return;
+        list.forEach(function (o) { o.wk = w.id; o.n = n; });
+        grp.push({ ch: w.ch, day: x.getTime(), st: st, live: !!w.live, list: list, cdl: cdl });
+      });
+    }
+    // SLOT DELAY (2026-11-20): a live broadcast on the channel (a one-off override, or a weekly live slot) that overlaps a weekly slot pushes the slot to the
+    // broadcast's actual end (override end, or the moment the player reported "ended"); it then airs from the top at full length, and every later slot that
+    // night shifts by the same delay. Late tuners join at their offset from the delayed start.
+    grp.sort(function (a, b) { return a.ch < b.ch ? -1 : a.ch > b.ch ? 1 : a.st - b.st; });
+    var occ = [], dly = {}, lives = [];
+    grp.forEach(function (g) {
+      var dk = g.ch + "/" + g.day, del = dly[dk] || 0;
+      if (g.live) { lives.push({ ch: g.ch, start: g.list[0].start, end: ovEndAt(g.list[0]), ov: 1 }); g.list.forEach(function (o) { o.slot = o.start; }); }
+      else {
+        var sh = function (dt) { g.list.forEach(function (o) { o.start += dt; o.end += dt; }); };
+        sh(del);
+        for (var guard = 0; guard < 8; guard++) {
+          var gs = g.list[0].start, ge = g.list[g.list.length - 1].end, push = 0;
+          one.concat(lives).forEach(function (b) { if (b.ch !== g.ch || b.vod) return; var be = b.ov ? b.end : ovEndAt(b); if (b.start < ge && be > gs && be - gs > push) push = be - gs; });
+          if (!push) break; sh(push); del += push;
+        }
+        dly[dk] = del; g.list.forEach(function (o) { o.slot = g.list[0].start; o.delayed = del; });
+      }
+      var f = g.list[0]; if (!f.delayed) { f.countdown_from = f.start - 3600; f.logo = "logos/wrestlingnet.png"; f.cd_label = (f.ep || f.title) + g.cdl; }
+      occ = occ.concat(g.list);
+    });
+    occ.sort(function (a, b) { return a.start - b.start || a.slot - b.slot; });
+    // a later weekly slot always truncates an earlier one on the same channel
+    occ.forEach(function (o) { occ.forEach(function (q) { if (q.ch === o.ch && q.slot > o.slot && q.slot < o.end && q.slot >= o.start) o.end = q.slot; }); });
+    var out = occ.filter(function (o) { return o.end > o.start; });
+    wkOcc.k = key; wkOcc.v = out; return out;
+  }
+  function ovList(t) { var L = (LIVE && LIVE.ov) || [], w = wkOcc(t); return w.length ? L.concat(w) : L; }
+  W.__cableWk = function (t) { return wkOcc(t == null ? now() : t).map(function (o) { return { id: o.wk, vid: o.vid, title: o.title, ep: o.ep, start: o.start, end: o.end, n: o.n, ei: o.ei, pl: o.pl, part: o.part, live: !!o.ls }; }); };
+  function ovFor(c, t) { var L = ovList(t); for (var j = 0; j < L.length; j++) { var o = L[j]; if (c && o.ch === c.id && t >= o.start && t < o.end && !S.ovDead[ovKey(o)]) return o; } return null; }
   function ovProg(o) { return { live: 1, ov: o, i: -1, k: -1, start: o.start, end: o.end }; }
   function ovNow() { var c = CH[S.ch], o = !S.vod && c && !c.hls ? ovFor(c, now()) : null; return o && S.playing === o.vid ? o : null; }
-  function ovDrop(o, why) { if (!o) return; S.ovDead[ovKey(o)] = 1; LOG.push(["ovend", o.vid, why, Date.now()]); }
+  function ovDrop(o, why) { if (!o) return; S.ovDead[ovKey(o)] = 1; LOG.push(["ovend", o.vid, why, Date.now()]);
+    if (why === "ended" && !o.vod) { S.ovEndAt[ovKey(o)] = Math.min(o.end, now()); S.ovEndRev = (S.ovEndRev || 0) + 1; } } // a live broadcast that ended early: delayed weekly slots start now
+  S.ovEndAt = {};
+  function ovEndAt(o) { var e = S.ovEndAt[ovKey(o)]; return e != null && e < o.end ? e : o.end; }
+  W.__cableOvEnded = function () { var o = ovNow(); if (!o) return null; ovDrop(o, "ended"); S.override = null; S.picOK = false; tune(S.ch, { quiet: true, keepLast: true }); return o.vid; }; // test hook = the player's ENDED path
   // countdown overlay (2026-11-20): override with countdown_from -> upper-right "LIVE IN mm:ss" on that channel until start
-  function cdFor(c, t) { var L = (LIVE && LIVE.ov) || []; for (var j = 0; j < L.length; j++) { var o = L[j]; if (c && o.ch === c.id && o.countdown_from && t >= o.countdown_from && t < o.start && !S.ovDead[ovKey(o)]) return o; } return null; }
+  function cdFor(c, t) { var L = ovList(t); for (var j = 0; j < L.length; j++) { var o = L[j]; if (c && o.ch === c.id && o.countdown_from && !o.ticker && t >= o.countdown_from && t < o.start && !S.ovDead[ovKey(o)]) return o; } return null; }
   function cdTick() {
     var el = $("#ovcd"); if (!el) return; var c = !S.vod && S.started ? CH[S.ch] : null, o = c && !c.hls ? cdFor(c, now()) : null;
     if (!o) { if (!el.hidden) el.hidden = true; return; }
     var r = Math.max(0, Math.ceil(o.start - now())), h = Math.floor(r / 3600), m = Math.floor(r % 3600 / 60), sc = r % 60;
     var txt = (h ? h + ":" + (m < 10 ? "0" : "") : "") + m + ":" + (sc < 10 ? "0" : "") + sc;
-    if (el.dataset.k !== ovKey(o)) { el.dataset.k = ovKey(o); $("img", el).hidden = !o.logo; if (o.logo) $("img", el).src = o.logo; $(".cd-lb", el).textContent = o.cd_label || o.title; }
+    if (el.dataset.k !== ovKey(o)) { el.dataset.k = ovKey(o); $("img", el).hidden = !o.logo; if (o.logo) $("img", el).src = o.logo; $(".cd-lb", el).textContent = o.cd_label || o.title; $(".cd-p", el).textContent = o.cd_pre || "LIVE IN"; }
     $(".cd-t", el).textContent = txt; el.hidden = false;
   }
   setInterval(cdTick, 1000);
+  // upper-LEFT event ticker (2026-11-20, OVW Chained Carnage on 79): override with ticker {logo, label} -> #cctk on that channel: logo + label + "Nd hh:mm:ss"
+  // until start, a small LIVE badge while the override is on air, gone after end. See-through (50 % dark + blur). Hidden outside live TV (guide / ON DEMAND).
+  function tkTick() {
+    var el = $("#cctk"); if (!el) return; var c = !S.vod && S.started && S.mode === "tv" ? CH[S.ch] : null, t = now(), o = null, L = (LIVE && LIVE.ov) || [];
+    if (c && !c.hls) for (var j = 0; j < L.length; j++) { var q = L[j]; if (q.ticker && q.ch === c.id && t < ovEndAt(q) && !(t >= q.start && S.ovDead[ovKey(q)])) { o = q; break; } }
+    if (!o) { if (!el.hidden) el.hidden = true; return; }
+    var live = t >= o.start;
+    if (el.dataset.k !== ovKey(o)) { el.dataset.k = ovKey(o); $("img", el).src = o.ticker.logo; $(".tk-lb", el).textContent = o.ticker.label; }
+    el.classList.toggle("live", live);
+    if (!live) { var r = Math.max(0, Math.ceil(o.start - t)), dd = Math.floor(r / 86400), h = Math.floor(r % 86400 / 3600), m = Math.floor(r % 3600 / 60), sc = r % 60, p2 = function (v) { return (v < 10 ? "0" : "") + v; };
+      $(".tk-t", el).textContent = (dd ? dd + "d " : "") + p2(h) + ":" + p2(m) + ":" + p2(sc); }
+    var sc0 = $("#screen"), w = sc0 ? sc0.clientWidth : 640, fs = Math.round(Math.max(9, Math.min(26, w * 0.0135)));
+    if (el.dataset.fs !== String(fs)) { el.dataset.fs = String(fs); el.style.fontSize = fs + "px"; }
+    el.hidden = false;
+  }
+  setInterval(tkTick, 1000);
+  W.__cableTk = function () { var el = $("#cctk"); return { shown: !!el && !el.hidden, live: !!el && el.classList.contains("live"), lb: el && $(".tk-lb", el).textContent, t: el && $(".tk-t", el).textContent, box: el && !el.hidden ? el.getBoundingClientRect().toJSON() : null }; };
   // corner promo + QR (2026-11-20): live.json pr [{ch,start,end,text,qr_url,qr}] -> #ovpr upper-right of the picture (same spot/style as #ovcd), hidden while #ovcd shows.
   // QR edge = 11 % of the picture width (min 48 px, max 176 px) so it scans from across the room on a TV and stays small on phones / guide preview.
   function prFor(c, t) { var L = (LIVE && LIVE.pr) || []; for (var j = 0; j < L.length; j++) { var p = L[j]; if (c && p.ch === c.id && t >= p.start && t < p.end) return p; } return null; }
@@ -109,7 +205,7 @@
   W.__cableOv = function () { return { on: ovNow(), dead: S.ovDead }; };
   function nextOf(c, p) { var k = (p.k + 1) % c.seq.length; return { k: k, i: c.seq[k], start: p.end, end: p.end + VV[c.seq[k]][2] }; }
   function progs(c, t0, t1) { if (c.hls) return [{ live: 1, start: t0 - 3600, end: t1 + 3600 }]; var out = [], p = at(c, t0); while (p.start < t1 && out.length < 60) { out.push(p); p = nextOf(c, p); }
-    var L = (LIVE && LIVE.ov) || []; L.forEach(function (o) { // a live override replaces the scheduled programs it overlaps
+    var L = ovList(t0); L.forEach(function (o) { // a live override replaces the scheduled programs it overlaps
       if (o.ch !== c.id || S.ovDead[ovKey(o)] || o.end <= t0 || o.start >= t1) return; var res = [];
       out.forEach(function (q) { if (q.ov || q.end <= o.start || q.start >= o.end) { res.push(q); return; }
         if (q.start < o.start) res.push({ k: q.k, i: q.i, start: q.start, end: o.start }); if (q.end > o.end) res.push({ k: q.k, i: q.i, start: o.end, end: q.end }); });
@@ -129,14 +225,19 @@
     var s = d.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; d.head.appendChild(s);
     W.onYouTubeIframeAPIReady = function () { mkPlayer(0); mkPlayer(1); };
   }
-  function mkPlayer(n) {
-    var p = new YT.Player("yt" + n, { width: "100%", height: "100%", host: "https://www.youtube.com",
-      playerVars: { autoplay: 0, mute: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: location.origin,
+  function mkPlayer(n, ls, cb) { // ls = YouTube channel id: player built on embed/live_stream?channel=ls (no video id needed; loadVideoById can't do this)
+    var p = new YT.Player("yt" + n, { width: "100%", height: "100%", host: "https://www.youtube.com", videoId: ls ? "live_stream" : undefined,
+      playerVars: { autoplay: ls ? 1 : 0, mute: 1, channel: ls || undefined, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: location.origin,
         cc_load_policy: S.cc ? 1 : 0, cc_lang_pref: "en" },
       events: { onReady: function () { p.rdy = 1; var f = p.getIframe && p.getIframe(); if (f) { f.setAttribute("allow", "autoplay; encrypted-media"); f.setAttribute("tabindex", "-1"); f.setAttribute("aria-hidden", "true"); }
-          if (PL[0] && PL[0].rdy && PL[1] && PL[1].rdy && !ytReady) { ytReady = true; YTP = PL[act]; if (ytQ) { var q = ytQ; ytQ = null; ytLoad(q.id, q.at, q.o); } } },
+          if (PL[0] && PL[0].rdy && PL[1] && PL[1].rdy && !ytReady) { ytReady = true; YTP = PL[act]; if (ytQ) { var q = ytQ; ytQ = null; ytLoad(q.id, q.at, q.o); } } if (cb) cb(p); },
         onStateChange: function (e) { onYTState(n, e); }, onError: function (e) { onYTError(n, e); }, onApiChange: function () { if (n === act) applyCC(); } } });
-    PL[n] = p;
+    p.ls = ls || null; PL[n] = p;
+  }
+  function rebuild(n, ls, cb) { // swap one of the two players between a normal player and a live_stream player
+    try { PL[n].destroy(); } catch (e) {}
+    var w = d.getElementById("yp" + n); if (!d.getElementById("yt" + n)) w.innerHTML = '<div id="yt' + n + '"></div>';
+    LOG.push(["rebuild", n, ls || "", Date.now()]); mkPlayer(n, ls, cb);
   }
   function hasGesture() { return !!W.CableNative || S.gesture || !!(navigator.userActivation && navigator.userActivation.hasBeenActive); }
   // our own layers over the picture: #cover = black slate with the channel (tuning / please stand by), #tunefx = quick static on a channel change
@@ -157,6 +258,9 @@
     var sb = 1 - act, p = PL[sb];
     if (job && !job.done) job.done = true;
     var j = job = { id: id, start: Math.max(0, Math.floor(start || 0)), t0: Date.now(), n: sb, ok: false, ad: false, last: null, kick: false, o: o };
+    if (o.ls || p.ls) { // live_stream slot (or leaving one): rebuild the standby player, then load
+      j.wait = 1; rebuild(sb, o.ls || null, function (np) { if (job !== j || j.done) return; j.wait = 0; j.t0 = Date.now(); j.last = null; j.lastMove = null; try { np.mute(); if (!o.ls) np.loadVideoById(o.live && !o.ovod ? { videoId: id } : { videoId: id, startSeconds: j.start }); np.playVideo(); } catch (e) {} });
+    } else
     try { p.mute(); p.loadVideoById(o.live && !o.ovod ? { videoId: id } : { videoId: id, startSeconds: j.start }); p.playVideo(); } catch (e) {}
     try { PL[act].mute(); } catch (e) {}
     if (!o.keep || !S.picOK) { S.picOK = false; cover("tune"); }
@@ -280,7 +384,7 @@
   function stall() {}
   // pre-cue the next program in the standby player ~20 s before the boundary (metadata + first frames ready for the cut)
   function precue() {
-    if (!ytReady || S.vod || !S.started || (job && !job.done)) return; var c = CH[S.ch]; if (!c || c.hls || ovFor(c, now())) return;
+    if (!ytReady || S.vod || !S.started || (job && !job.done)) return; var c = CH[S.ch]; if (!c || c.hls || ovFor(c, now()) || PL[1 - act].ls) return;
     var p = S.override && S.override.ch === S.ch ? S.override : at(c, now()); if (p.end - now() > 20 || p.end - now() < 2) return;
     var n = nextOf(c, p), id = VV[n.i][0]; if (precue.id === id) return; precue.id = id;
     try { PL[1 - act].cueVideoById({ videoId: id, startSeconds: 0 }); LOG.push(["cue", id, Date.now()]); } catch (e) {}
@@ -372,8 +476,9 @@
     if (c.hls) { S.playing = "hls:" + c.id; tuneHls(c); }
     else {
       var fromHls = !$("#hls").hidden; killHls(); if (fromHls) S.picOK = false;
+      if (!o.quiet) Object.keys(S.ovDead).forEach(function (k) { if (k.indexOf(c.id + ":live:") === 0) delete S.ovDead[k]; }); // weekly live slot: its fallback lasts until the next tune
       var ov = ovFor(c, now());
-      if (ov) { S.playing = ov.vid; var ovo = ov.vod ? Math.max(0, now() - ov.start) : 0; LOG.push(["ov", ov.vid, ov.end, Date.now(), ovo]); ytLoad(ov.vid, ovo, { keep: true, live: true, ovod: !!ov.vod }); }
+      if (ov) { S.playing = ov.vid; var ovo = ov.vod ? Math.max(0, now() - ov.start) : 0; LOG.push(["ov", ov.vid, ov.end, Date.now(), ovo]); ytLoad(ov.vid, ovo, { keep: true, live: true, ovod: !!ov.vod, ls: ov.ls || null }); }
       else {
       var p = at(c, now()), tries = 0;
       while (S.bad[VV[p.i][0]] && tries++ < 30) p = nextOf(c, p);
@@ -381,7 +486,7 @@
       S.playing = VV[p.i][0]; ytLoad(VV[p.i][0], Math.max(0, now() - p.start), { keep: true });
       }
     }
-    cdTick(); prTick();
+    cdTick(); prTick(); tkTick();
     if (c.hls) { setBug(null, ""); $("#bug").dataset.own = c.id; } else { setBug(c.id, c.call); $("#bug").dataset.own = ""; } // live feeds already burn in their own bug
     if (!o.quiet || S.mode === "tv") { if (S.mode === "tv") showBanner(); }
     if (S.mode === "guide") { guideInfo(); gCur(); }
@@ -413,7 +518,7 @@
   setInterval(function () { // keep live channels on schedule
     if (!S.started || S.vod) return; var c = CH[S.ch]; if (!c || c.hls) return;
     var ov = ovFor(c, now()); if (ov) { if (S.playing !== ov.vid) tune(S.ch, { quiet: true, keepLast: true }); return; }
-    if (S.playing && !VIDX.hasOwnProperty(S.playing) && (LIVE.ov || []).some(function (o) { return o.vid === S.playing; })) { S.override = null; S.picOK = false; return tune(S.ch, { quiet: true, keepLast: true }); } // override window over
+    if (S.playing && !VIDX.hasOwnProperty(S.playing) && (/^live:/.test(S.playing) || ovList(now()).some(function (o) { return o.vid === S.playing; }))) { S.override = null; S.picOK = false; return tune(S.ch, { quiet: true, keepLast: true }); } // override window over
     if (S.override) { if (now() >= S.override.end) { S.override = null; tune(S.ch, { quiet: true, keepLast: true }); } return; }
     var p = at(c, now()); if (VV[p.i][0] !== S.playing && !S.bad[VV[p.i][0]]) tune(S.ch, { quiet: true, keepLast: true });
   }, 5000);
@@ -445,9 +550,10 @@
     } else if (ovNow()) {
       var o = ovNow(), na = at(c, o.end), nav = V(na.i);
       $(".bn-title", b).textContent = o.title;
+      if (o.wk && o.vod) $(".bn-sub", b).textContent = hm(o.start) + " - " + hm(o.end) + "  \u00b7  " + o.ep + "  \u00b7  " + (TYPEN[o.ty] === "Full Match" ? "Full Match" : "Full Show") + "  \u00b7  " + o.src; else
       $(".bn-sub", b).textContent = o.vod ? hm(o.start) + " - " + hm(o.end) + "  \u00b7  Full Event" + (o.yr ? " (" + o.yr + ")" : "") + "  \u00b7  " + (o.src || c.name) : "LIVE  \u00b7  until " + hm(o.end) + "  \u00b7  " + (o.src || c.name);
       $(".bn-bar i", b).style.width = o.vod ? Math.min(100, Math.max(0, (now() - o.start) / (o.end - o.start) * 100)) + "%" : "100%";
-      $(".bn-next", b).innerHTML = (o.vod ? "<b>PREMIERE</b>" : "<b>LIVE</b>") + " &middot; <b>Next " + hm(o.end) + ":</b> " + esc(nav.sh >= 0 ? SHOWS[nav.sh].n + " - " + nav.t : nav.t);
+      $(".bn-next", b).innerHTML = (o.wk && o.vod ? "<b>PRIMETIME</b>" : o.vod ? "<b>PREMIERE</b>" : "<b>LIVE</b>") + " &middot; <b>Next " + hm(o.end) + ":</b> " + esc(nav.sh >= 0 ? SHOWS[nav.sh].n + " - " + nav.t : nav.t);
     } else {
       var p = S.override && S.override.ch === S.ch ? S.override : at(c, now()), v = V(p.i), n = nextOf(c, p);
       $(".bn-title", b).textContent = v.sh >= 0 ? SHOWS[v.sh].n : v.t;
@@ -530,7 +636,7 @@
       var a = Math.max(p.start, G.w0), b = Math.min(p.end, w1), L = (a - G.w0) / wl * 100, Wd = (b - a) / wl * 100;
       if (Wd <= 0) return;
       var label, sub, cls = "", rec = "";
-      if (p.ov) { label = p.ov.title; sub = (p.ov.vod ? "PREMIERE \u00b7 " : "LIVE \u00b7 ") + (p.ov.src || c.name); cls = p.ov.vod ? " ovl ovv" : " live ovl"; }
+      if (p.ov) { label = p.ov.title; sub = p.ov.wk && p.ov.vod ? p.ov.ep : (p.ov.vod ? "PREMIERE \u00b7 " : "LIVE \u00b7 ") + (p.ov.src || c.name); cls = p.ov.vod ? " ovl ovv" : " live ovl"; }
       else if (p.live) { label = c.name + " - Live Feed"; sub = c.tag; cls = " live"; }
       else { var v = V(p.i); label = v.sh >= 0 ? SHOWS[v.sh].n : v.t; sub = v.sh >= 0 ? v.t : TYPEN[v.ty] + (v.yr ? " (" + v.yr + ")" : ""); if (v.ty === "M") cls = " mv"; rec = recMark(c, p); }
       cells += '<div class="g-cell' + cls + (rec ? " recd" : "") + '" data-r="' + r + '" data-t="' + (p.live && !p.ov ? G.w0 : p.start) + '" data-e="' + (p.live && !p.ov ? w1 : p.end) + '" style="left:' + L + "%;width:" + Wd + '%">' +
@@ -603,6 +709,7 @@
     $(".g-clock").textContent = clock();
     var sp = selProg(); if (!sp) return; var c = sp.c, p = sp.p;
     if (c.hls) { $(".g-ititle").textContent = c.name + " - Live"; $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  LIVE"; $(".g-idesc").textContent = c.tag + ". Real live network feed. Full schedule at " + (c.sched || "").replace(/^https?:\/\//, "") + "."; return; }
+    if (p.ov && p.ov.wk) { $(".g-ititle").textContent = p.ov.title + (p.ov.ep ? ": " + p.ov.ep : ""); $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  " + hm(p.start) + " - " + hm(p.end) + "  \u00b7  " + (p.ov.vod ? "WEEKLY \u00b7 FULL SHOW" : "LIVE"); $(".g-idesc").textContent = p.ov.vod ? "Weekly primetime: " + (p.ov.ei == null ? "a " + p.ov.src + " block of full shows (padded with full matches)" : "a full " + p.ov.src + " show (episode " + (p.ov.ei + 1) + " of " + p.ov.pl + " in the rotation, oldest to newest)") + ". " + c.name + "'s regular mix resumes at " + hm(p.end) + "." : "Live every week from " + p.ov.src + " (official YouTube live stream). If there's no stream, " + c.name + "'s regular mix plays."; return; }
     if (p.ov) { $(".g-ititle").textContent = p.ov.title; $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  " + hm(p.start) + " - " + hm(p.end) + "  \u00b7  " + (p.ov.vod ? "PREMIERE" : "LIVE"); $(".g-idesc").textContent = p.ov.vod ? "Special presentation: the full event from " + (p.ov.src || c.name) + ", from the opening bell. " + c.name + "'s regular schedule resumes at " + hm(p.end) + "." : "Live now from " + (p.ov.src || c.name) + ". Free official live stream; " + c.name + "'s regular schedule resumes at " + hm(p.end) + "."; return; }
     var v = V(p.i), sh = v.sh >= 0 ? SHOWS[v.sh] : null;
     $(".g-ititle").textContent = sh ? sh.n + ": " + v.t : v.t;
