@@ -226,12 +226,14 @@
     W.onYouTubeIframeAPIReady = function () { mkPlayer(0); mkPlayer(1); };
   }
   function mkPlayer(n, ls, cb) { // ls = YouTube channel id: player built on embed/live_stream?channel=ls (no video id needed; loadVideoById can't do this)
-    var p = new YT.Player("yt" + n, { width: "100%", height: "100%", host: "https://www.youtube.com", videoId: ls ? "live_stream" : undefined,
-      playerVars: { autoplay: ls ? 1 : 0, mute: 1, channel: ls || undefined, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: location.origin,
+    var opt = { width: "100%", height: "100%", host: "https://www.youtube.com",
+      playerVars: { autoplay: ls ? 1 : 0, mute: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, enablejsapi: 1, origin: location.origin,
         cc_load_policy: S.cc ? 1 : 0, cc_lang_pref: "en" },
       events: { onReady: function () { p.rdy = 1; var f = p.getIframe && p.getIframe(); if (f) { f.setAttribute("allow", "autoplay; encrypted-media"); f.setAttribute("tabindex", "-1"); f.setAttribute("aria-hidden", "true"); }
           if (PL[0] && PL[0].rdy && PL[1] && PL[1].rdy && !ytReady) { ytReady = true; YTP = PL[act]; if (ytQ) { var q = ytQ; ytQ = null; ytLoad(q.id, q.at, q.o); } } if (cb) cb(p); },
-        onStateChange: function (e) { onYTState(n, e); }, onError: function (e) { onYTError(n, e); }, onApiChange: function () { if (n === act) applyCC(); } } });
+        onStateChange: function (e) { onYTState(n, e); }, onError: function (e) { onYTError(n, e); }, onApiChange: function () { if (n === act) applyCC(); } } };
+    if (ls) { opt.videoId = "live_stream"; opt.playerVars.channel = ls; } // only then: an undefined videoId key throws "Invalid video id" in the widget API
+    var p = new YT.Player("yt" + n, opt);
     p.ls = ls || null; PL[n] = p;
   }
   function rebuild(n, ls, cb) { // swap one of the two players between a normal player and a live_stream player
