@@ -65,7 +65,7 @@ button{font-family:inherit;color:inherit}
 .dlg-s{color:#ffcc00;font-size:13px;font-weight:bold;margin:4px 0 10px}
 .dlg-b{display:flex;flex-direction:column;gap:7px}
 .dlg-b .fbtn{text-align:left;font-size:14px;padding:9px 12px}
-.lg.live::after{content:"LIVE";font:bold .45em Verdana,sans-serif;margin-left:.35em;background:#e00;color:#fff;padding:.15em .3em;border-radius:2px;letter-spacing:0}
+.lg.live::after{display:none;content:"";font:bold .45em Verdana,sans-serif;margin-left:.35em;background:#e00;color:#fff;padding:.15em .3em;border-radius:2px;letter-spacing:0}
 .logo-cable{font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-style:italic;letter-spacing:1px;background:linear-gradient(#fff,#cfd8ff 55%,#8ea3e8 56%,#fff);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 2px 0 #000)}
 .logo-cable.big{font-size:64px}
 /* brand: Comcast-2006-style wordmark (cable-logo-w.svg = white text + red crescent) */
