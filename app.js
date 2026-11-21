@@ -28,7 +28,9 @@
   var SRCLOGO = { AETV: "ae", NCIS: "cbs", CBS: "cbs", FortyEight: "cbs", SixtyMin: "cbs", TwoHalfMen: "cbs", Showtime: "showtime", History: "history", PawnStars: "history",
     Lifetime: "lifetime", TLC: "tlc", MTVRealityUK: "mtv", MTVVault: "mtv", Discovery: "discovery", Science: "science", NatGeo: "natgeo", COPS: "realcops", TruBlu: "trublu", WWF: "wwf", TheCW: "thecw",
     CWSports: "thecw", Reelz: "reelz", GSN: "gsn", OWN: "own", PBS: "pbs", PBSDocs: "pbs", Starz: "starz", WEtv: "wetv", Oxygen: "oxygen", BET: "bet",
-    PokemonTV: "kidswb", Pokemon: "kidswb", RegularShow: "cn", TotalDrama: "cn", AquaTeen: "cn", RickMorty: "cn", PBSKids: "pbskids" };
+    PokemonTV: "kidswb", Pokemon: "kidswb", RegularShow: "cn", TotalDrama: "cn", AquaTeen: "cn", RickMorty: "cn", PBSKids: "pbskids",
+    KUWTK: "e", EEnt: "e", ENews: "e", EInsider: "e", Peacock: "nbcpeacock", NBC: "nbcpeacock",
+    DC: "dc", Crunchyroll: "anime", CrunchyrollDubs: "anime", AvatarLegends: "anime", TCM: "tcmplus", Friends: "friends" };
   function lgInfo(id) { return LIVE && LIVE.logos && LIVE.logos[id]; }
   function imgLogo(id, alt, extra) { var L = lgInfo(id); return '<span class="lg lgi ' + (L[0] === "d" ? "pd" : "pl") + (extra || "") + '"><img src="logos/' + id + '.png" alt="' + esc(alt) + '" decoding="async" style="aspect-ratio:' + L[1] + '"></span>'; }
   function logo(c, big) {
