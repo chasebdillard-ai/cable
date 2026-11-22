@@ -8,7 +8,7 @@
   if (IS_TV) d.documentElement.classList.add("tv");
   var APPLE = /iP(hone|ad|od)/.test(UA) || (/Safari\//.test(UA) && /Apple/.test(navigator.vendor || "") && !/Chrome|Chromium|CriOS|Android/.test(UA));
   var CAT = null, LIVE = null, SRC = [], SHOWS = [], PEOPLE = [], GEN = [], VV = [], CH = [], VIDX = {};
-  var TYPEN = { E: "Episode", M: "Movie", D: "Documentary", S: "Special", K: "Marathon", F: "Full Event", W: "Full Match" }, TYPEP = { W: "Full Matches", D: "Documentaries" };
+  var TYPEN = { E: "Episode", M: "Movie", D: "Documentary", S: "Special", K: "Marathon", F: "Full Event", W: "Full Match", C: "Compilation" }, TYPEP = { W: "Full Matches", D: "Documentaries" };
   var S = { mode: "boot", ch: 0, last: 0, playing: null, vod: null, override: null, started: false, soundOK: false, bad: {} };
   var LS = W.localStorage || { getItem: function () { return null; }, setItem: function () {}, removeItem: function () {} };
   S.cc = LS.getItem("cable_cc") === "1"; // closed captions: OFF unless this device turned them on
@@ -25,7 +25,7 @@
   function V(i) { var v = VV[i]; return { i: i, id: v[0], t: v[1], d: v[2], src: v[3], sh: v[4], s: v[5], e: v[6], ty: v[7], yr: v[8], up: v[9], g: v[10], cast: v[11] }; }
   function vtitle(v) { var sh = v.sh >= 0 ? SHOWS[v.sh].n : ""; return sh ? sh + (v.s || v.e ? " (S" + (v.s || "?") + (v.e ? ", E" + v.e : "") + ")" : "") + ": " + v.t : v.t; }
   // real network logos (Wikimedia Commons / Wikipedia, downloaded into logos/): LIVE.logos[id] = [plate l|d, aspect, mono aspect]
-  var SRCLOGO = { Apple: "apple", Revolver: "wrestlingnet", Psychopathic: "wrestlingnet", UWN: "wrestlingnet", MapleLeafPro: "wrestlingnet", DEFY: "wrestlingnet", ROH: "wrestlingnet", OVW: "wrestlingnet", CrimeTown: "monarch", FoxholeFeatures: "monarch", BoomerChannel: "monarch", AETV: "ae", NCIS: "cbs", CBS: "cbs", FortyEight: "cbs", SixtyMin: "cbs", TwoHalfMen: "cbs", Showtime: "showtime", History: "history", PawnStars: "history",
+  var SRCLOGO = { Apple: "apple", COPSFE: "code3", OPLive: "code3", Crime360: "ae", Revolver: "wrestlingnet", Psychopathic: "wrestlingnet", UWN: "wrestlingnet", MapleLeafPro: "wrestlingnet", DEFY: "wrestlingnet", ROH: "wrestlingnet", OVW: "wrestlingnet", CrimeTown: "monarch", FoxholeFeatures: "monarch", BoomerChannel: "monarch", AETV: "ae", NCIS: "cbs", CBS: "cbs", FortyEight: "cbs", SixtyMin: "cbs", TwoHalfMen: "cbs", Showtime: "showtime", History: "history", PawnStars: "history",
     Lifetime: "lifetime", TLC: "tlc", TLCAU: "tlc", TLCUK: "tlc", MTVRealityUK: "mtvuk", MTVUK: "mtvuk", MTVVault: "mtv", MTVUS: "mtv", TeenMom: "mtv", Ridiculousness: "mtv", JerseyShore: "mtv", Catfish: "mtv", Discovery: "discovery", Science: "science", NatGeo: "natgeo", COPS: "realcops", TruBlu: "trublu", WWF: "wwf", TheCW: "thecw",
     CWSports: "thecw", Reelz: "reelz", GSN: "gsn", OWN: "own", PBS: "pbs", PBSDocs: "pbs", Starz: "starz", WEtv: "wetv", Oxygen: "oxygen", BET: "bet",
     PokemonTV: "kidswb", Pokemon: "kidswb", RegularShow: "cn", TotalDrama: "cn", AquaTeen: "cn", RickMorty: "cn", PBSKids: "pbskids",
@@ -1092,7 +1092,7 @@
           var sl = Object.keys(shs).map(Number); if (sl.length) { items.push({ hd: 1, label: "Shows that premiered in the " + dc + "s" }); sl.forEach(function (n) { items.push(showItem(n)); }); }
           if (loose.length) { items.push({ hd: 1, label: "Movies & documentaries" }); loose.forEach(function (i) { items.push(vidItem(i, loose)); }); } return { title: dc + "s", items: items }; } }; }) };
   }
-  function typeScreen() { var bt = IX().byType; return { title: "Program Type", items: ["E", "M", "D", "S", "K", "F", "W"].filter(function (t) { return (bt[t] || []).length; }).map(function (t) { return { label: TYPEP[t] || TYPEN[t] + "s", count: bt[t].length, ic: "&#9658;", art: thumb(VV[bt[t][0]][0]), screen: function () { return listScreen(TYPEN[t] + "s (newest first)", bt[t], { withShow: true, max: 500 }); } }; }) }; }
+  function typeScreen() { var bt = IX().byType; return { title: "Program Type", items: ["E", "M", "D", "S", "K", "C", "F", "W"].filter(function (t) { return (bt[t] || []).length; }).map(function (t) { return { label: TYPEP[t] || TYPEN[t] + "s", count: bt[t].length, ic: "&#9658;", art: thumb(VV[bt[t][0]][0]), screen: function () { return listScreen(TYPEN[t] + "s (newest first)", bt[t], { withShow: true, max: 500 }); } }; }) }; }
   function networksScreen() { var bs = IX().bySrc; return { title: "Networks", items: SRC.map(function (s, k) { return k; }).filter(function (k) { return (bs[k] || []).length; }).sort(function (a, b) { return SRC[a][1].localeCompare(SRC[b][1]); }).map(function (k) { return { label: SRC[k][1], count: bs[k].length, ic: srcLogo(k) ? "" : "&#9658;", logo: srcLogo(k), art: thumb(VV[bs[k][0]][0]), netlogo: srcLogoId(k), info: (srcLogo(k) ? '<div class="od-netlogo">' + srcLogo(k) + "</div>" : "") + "<h3>" + esc(SRC[k][1]) + '</h3><div class="m">' + esc(SRC[k][2]) + " \u00b7 YouTube " + esc(SRC[k][4]) + "</div><p>" + bs[k].length + " free full-length programs.</p>", screen: function () { return srcScreen(k); } }; }) }; }
   function liveByGenreScreen() {
     var gs = {}; CH.forEach(function (c) { c.g.forEach(function (g) { (gs[g] = gs[g] || []).push(c); }); });
