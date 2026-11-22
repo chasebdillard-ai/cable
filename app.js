@@ -389,8 +389,9 @@
   }
   function sound() { // unmute when the browser allows it; otherwise stay muted with "Tap for sound"
     var p = PL[act];
+    if (S.umute) { try { p.mute(); } catch (e) {} $("#unmute").hidden = true; return; } // muted from the phone remote (2026-11-21)
     if (S.soundOK && hasGesture()) {
-      try { p.unMute(); p.setVolume(100); } catch (e) {}
+      try { p.unMute(); p.setVolume(vol()); } catch (e) {}
       setTimeout(function () { try { if (p !== PL[act]) return; if (p.getPlayerState() === 2) { p.mute(); p.playVideo(); needSound(); } else if (!p.isMuted()) $("#unmute").hidden = true; } catch (e) {} }, 900);
     } else needSound();
   }
@@ -512,7 +513,7 @@
     var hadYT = S.picOK && $("#hls").hidden; killHls(); if (job) job.done = true; job = null; try { PL[act].mute(); } catch (e) {}
     if (!hadYT) { ytStop(); cover("tune"); }
     var v = $("#hls"), srcs = c.hls.slice(), i = 0, round = 0, medRec = 0, me = c, st0 = null;
-    v.hidden = false; v.style.opacity = 0; v.muted = !(S.soundOK && hasGesture());
+    v.hidden = false; v.style.opacity = 0; v.muted = !!S.umute || !(S.soundOK && hasGesture()); try { v.volume = vol() / 100; } catch (e) {}
     function go() { var q = v.play(); if (q && q.catch) q.catch(function () { v.muted = true; needSound(); v.play().catch(function () {}); }); }
     function fail() {
       if (CH[S.ch] !== me) return;
@@ -541,7 +542,7 @@
         hls.loadSource(u); hls.attachMedia(v); watch();
       }, function () { fail(); });
     }
-    v.onplaying = function () { clearTimeout(st0); if (CH[S.ch] !== me) return; v.style.opacity = 1; ytStop(); S.picOK = true; cover(null); if (!v.muted) $("#unmute").hidden = true; else needSound(); hlsCC(); refocus(); };
+    v.onplaying = function () { clearTimeout(st0); if (CH[S.ch] !== me) return; v.style.opacity = 1; ytStop(); S.picOK = true; cover(null); if (!v.muted || S.umute) $("#unmute").hidden = true; else needSound(); hlsCC(); refocus(); };
     try { v.textTracks.onaddtrack = function () { hlsCC(); }; } catch (e) {}
     play();
   }
@@ -1276,6 +1277,7 @@
       { label: "My DVR / Recordings", ic: '<i class="rd"></i>', go: openDVR, info: "<h3>My DVR</h3><p>Your recordings, scheduled recordings and series recordings. Recorded programs play from the start, any time.</p>" },
       { label: "My Favorites", ic: "&#9733;", screen: favScreen },
       { label: s && s.user ? "My Account" : "Sign In / Create Account", ic: "&#9679;", screen: accountScreen },
+      { label: "Phone Remote \u00b7 Pair your phone", ic: "&#9783;", go: function () { if (W.CableRemoteTV) W.CableRemoteTV.open(); }, info: "<h3>Phone Remote</h3><p>Use your phone as the remote: D-pad, channel numbers, the guide and a tap-to-tune channel list.</p><p>" + (IS_TV ? "Press OK, then scan the code with your phone's camera." : "Choose it, then scan the code with your phone or open <b>chasebdillard-ai.github.io/cable/remote</b> and type the code.") + "</p>" },
       { label: "Get the App / Watch on TV", ic: "&#9632;", go: function () { location.href = "tv.html"; }, info: "<h3>Get the App</h3><p>Cable on Fire TV, Google TV, Android TV, phones, tablets, iPhone and iPad. Fire TV / Google TV: Downloader code <b>4793854</b>.</p>" },
       { label: "DONATE \u00b7 Support us on Cash App", ic: "$", go: function () { if (W.HKDonate) W.HKDonate.go(); else W.open("https://cash.app/$WrestleWorldPlus", "_blank", "noopener"); }, info: "<h3>DONATE</h3><p>Support us on Cash App: <b>$WrestleWorldPlus</b> (cash.app/$WrestleWorldPlus).</p><p>" + (IS_TV ? "Press OK for a QR code to scan with your phone." : "Opens Cash App in a new tab.") + "</p>" }
     ];
@@ -1408,12 +1410,13 @@
   $("#remote").addEventListener("click", function (e) { var b = e.target.closest("[data-r]"); if (!b) return; unmute(); var r = b.dataset.r; showRemote(); remoteAct(r); });
   function remoteAct(r) { LOG.push(["remote", r, Date.now()]);
     if (r === "up") chUp(1); else if (r === "down") chUp(-1); else if (r === "guide") openGuide(); else if (r === "od") openOD(); else if (r === "info") showBanner(8000);
-    else if (r === "last") tune(S.last); else if (r === "rec") key("rec"); else if (r === "dvr") openDVR(); else if (r === "cc") toggleCC(); else if (r === "fs") toggleFS(); }
+    else if (r === "last") tune(S.last); else if (r === "pair") { if (W.CableRemoteTV) W.CableRemoteTV.open(); } else if (r === "rec") key("rec"); else if (r === "dvr") openDVR(); else if (r === "cc") toggleCC(); else if (r === "fs") toggleFS(); }
   $("#banner").addEventListener("click", function (e) { var b = e.target.closest("[data-b]"); if (!b) return; e.stopPropagation(); if (b.dataset.b === "cc") toggleCC(); else key("rec"); showBanner(8000); });
   // a pressed on-screen button must not keep focus (Enter/OK would re-press it instead of reaching the remote handler)
   d.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("button"); if (b && !b.closest(".od-form") && !b.closest(".od-search")) setTimeout(function () { try { b.blur(); } catch (x) {} }, 0); });
   if (!d.documentElement.requestFullscreen && !d.documentElement.webkitRequestFullscreen) $$('[data-r="fs"]').forEach(function (b) { b.hidden = true; });
-  function unmute() { S.soundOK = true; S.gesture = true; LS.setItem("cable_sound", "1"); try { if (ytReady) { YTP.unMute(); YTP.setVolume(100); if (YTP.getPlayerState() === 2) YTP.playVideo(); } } catch (e) {} var v = $("#hls"); if (!v.hidden) { v.muted = false; v.play().catch(function () {}); } $("#unmute").hidden = true; }
+  function vol() { var x = parseInt(S.vol == null ? LS.getItem("cable_vol") || "100" : S.vol, 10); return isNaN(x) ? 100 : Math.max(0, Math.min(100, x)); }
+  function unmute() { S.umute = false; S.soundOK = true; S.gesture = true; LS.setItem("cable_sound", "1"); try { if (ytReady) { YTP.unMute(); YTP.setVolume(vol()); if (YTP.getPlayerState() === 2) YTP.playVideo(); } } catch (e) {} var v = $("#hls"); if (!v.hidden) { v.muted = false; v.volume = vol() / 100; v.play().catch(function () {}); } $("#unmute").hidden = true; }
   // the first touch / click / key anywhere counts as the gesture that turns sound on (remembered per device)
   ["pointerdown", "keydown", "touchend"].forEach(function (ev) { d.addEventListener(ev, function () { S.gesture = true; if (S.started && !$("#unmute").hidden) setTimeout(unmute, 0); }, true); });
   $("#unmute").addEventListener("click", function (e) { e.stopPropagation(); unmute(); });
@@ -1436,6 +1439,47 @@
   $("#pwbtn").addEventListener("click", powerOn);
   setInterval(function () { if (S.mode === "guide") { $(".g-clock").textContent = clock(); if (now() >= G.w0 + 1800 && Math.floor(now() / 1800) * 1800 > G.w0) { G.w0 = Math.floor(now() / 1800) * 1800; G.t = Math.max(G.t, now()); renderGuide(); } } else if (S.mode === "od") $(".od-clock").textContent = clock(); else if (!$("#banner").hidden) $(".bn-clock").textContent = clock(); }, 30000);
 
+  // ---------- phone remote (remote-tv.js -> W.CABLE.rc / rcState / rcLineup, 2026-11-21) ----------
+  // Commands arrive already decoded and authenticated. They go through the same key() paths as the TV remote / keyboard, so behaviour is identical.
+  function rcSetVol(x) { S.vol = Math.max(0, Math.min(100, Math.round(x))); LS.setItem("cable_vol", String(S.vol)); try { if (ytReady && !S.umute) YTP.setVolume(S.vol); } catch (e) {} var v = $("#hls"); try { v.volume = S.vol / 100; } catch (e) {} toast("Volume " + S.vol, 1200); }
+  function rcMute(on) { S.umute = on; var v = $("#hls");
+    if (on) { try { PL[0].mute(); PL[1].mute(); } catch (e) {} v.muted = true; $("#unmute").hidden = true; toast("Muted", 1500); }
+    else { unmute(); toast("Sound on", 1200); } }
+  function rcTuneTo(c) { if (!c) return false; if (!S.started) { powerOn(); } if (!S.started) return false; if (DLG) dlgKey("back"); if (S.mode !== "tv") { S.vod = null; setMode("tv"); } tune(c.idx); return true; }
+  function rc(cmd) {
+    cmd = String(cmd || ""); LOG.push(["rc", cmd, Date.now()]);
+    var m = /^(num|ch):(.+)$/.exec(cmd);
+    if (m) { var c = m[1] === "num" ? CH.filter(function (x) { return String(x.n) === chEntry(m[2]); })[0] : chById(m[2]); if (!c) { toast((m[1] === "num" ? "Channel " + chEntry(m[2]) : "That channel") + " is not available"); return false; } return rcTuneTo(c); }
+    if (cmd === "mute") return rcMute(!S.umute), true;
+    if (cmd === "vol+" || cmd === "vol-") { if (S.umute) rcMute(false); rcSetVol(vol() + (cmd === "vol+" ? 10 : -10)); return true; }
+    if (cmd === "power") { if (!S.started) powerOn(); return true; }
+    if (!S.started) { if (W.CABLE_GATE && W.CABLE_GATE.locked) return false; if (/^(ok|up|down|chup|chdn|guide|od|info|last|menu|pp)$/.test(cmd)) powerOn(); if (cmd === "guide" && S.started) openGuide(); if (cmd === "od" && S.started) openOD(); return true; }
+    var k = cmd;
+    if (k === "menu") k = "od"; // cable-box MENU = the Main Menu (ON DEMAND home: Live TV & Guide, My DVR, Favorites ...)
+    if (k === "exit") { if (DLG) dlgKey("back"); if (S.mode !== "tv") goLive(); else { $("#banner").hidden = true; menuClose(); } return true; }
+    if (k === "back" && !DLG && S.mode === "tv") { // live TV: Back only closes what is open (the phone has its own LAST button)
+      if (W.__cableMenu && W.__cableMenu()) { menuClose(); $("#banner").hidden = true; } else if (!$("#banner").hidden) $("#banner").hidden = true; return true; }
+    if (k === "ff" || k === "rw") { if (S.mode === "vod" && !DLG) { vodAct(k); return true; } k = k === "ff" ? "chup" : "chdn"; }
+    if (k === "pp") { if (S.mode === "vod" && !DLG) vodAct("pp"); else toast("Play/Pause works in ON DEMAND programs", 1800); return true; }
+    if ((S.mode === "guide" || S.mode === "od") && (k === "chup" || k === "chdn")) k = k === "chup" ? "pgup" : "pgdn";
+    key(k); return true;
+  }
+  function rcProg(c, t) { // -> [title, sub, start, end] of what channel c airs at t (same sources as the banner)
+    try {
+      if (c.hls) { var lp = liveAt(c, t); return lp && !lp.fill ? [lp.t, lp.sub || "", lp.start, lp.end] : [c.name + " - Live", c.tag || "", 0, 0]; }
+      var o = ovFor(c, t); if (o) return [o.title, o.vod ? (o.ep || o.src || "") : "LIVE", o.start, o.end];
+      var p = S.override && S.override.ch === c.idx && t >= S.override.start && t < S.override.end ? S.override : at(c, t), v = V(p.i);
+      return [v.sh >= 0 ? SHOWS[v.sh].n : v.t, v.sh >= 0 ? (v.s ? "S" + v.s + (v.e ? " E" + v.e : "") + " \u00b7 " : "") + v.t : TYPEN[v.ty] + (v.yr ? " (" + v.yr + ")" : ""), p.start, p.end];
+    } catch (e) { return [c.name, "", 0, 0]; }
+  }
+  function rcState() {
+    var c = CH[S.ch], st = { on: !!S.started, mode: S.mode, mute: !!S.umute, vol: vol(), dlg: !!DLG, gate: !!(W.CABLE_GATE && W.CABLE_GATE.locked), n: CH.length, tv: IS_TV };
+    if (c) { var pr = rcProg(c, now()); st.ch = { id: c.id, n: c.n, name: c.name, call: c.call, live: !!c.hls, logo: lgInfo(c.id) ? "logos/" + c.id + ".png" : "", plate: lgInfo(c.id) ? lgInfo(c.id)[0] : "" }; st.title = pr[0]; st.sub = pr[1]; st.start = pr[2]; st.end = pr[3]; }
+    if (S.vod) { var v = V(S.vod.i); st.vod = { title: vtitle(v), src: SRC[v.src] ? SRC[v.src][1] : "" }; try { st.vod.pos = Math.round(YTP.getCurrentTime() || 0); st.vod.dur = Math.round(YTP.getDuration() || v.d); st.vod.playing = YTP.getPlayerState() === 1; } catch (e) {} }
+    return st;
+  }
+  function rcLineup() { var t = now(); return CH.map(function (c) { var p = rcProg(c, t); return [c.id, p[0], p[1], p[2], p[3]]; }); }
+
   // ---------- boot ----------
   loadYT();
   var qv = (d.querySelector('script[src^="app.js"]') || {}).src || ""; qv = (qv.split("?")[1] || "");
@@ -1444,7 +1488,7 @@
     $(".pw-load").textContent = CH.length + " channels \u00b7 " + VV.length.toLocaleString() + " free programs ON DEMAND";
     var b = $("#pwbtn"); b.disabled = false; if (IS_TV) b.classList.add("focus"); try { b.focus(); } catch (e) {}
     ccUI(); recUI();
-    W.CABLE = { S: S, CH: CH, at: at, tune: tune, key: key, V: V, openOD: openOD, openGuide: openGuide, openDVR: openDVR, dvr: dvr, dvrEntries: dvrEntries, G: G, dlg: function () { return DLG; }, nextOf: nextOf, VIDX: VIDX, YTP: function () { return YTP; }, job: function () { return job; }, search: searchItems, push: push, screens: { srcScreen: srcScreen, WWFK: WWFK, typeScreen2: typeScreen, peopleScreen: peopleScreen, genresScreen: genresScreen, decadeScreen: decadeScreen, typeScreen: typeScreen, networksScreen: networksScreen, azScreen: azScreen, searchScreen: searchScreen } };
+    W.CABLE = { S: S, CH: CH, at: at, tune: tune, key: key, V: V, openOD: openOD, openGuide: openGuide, openDVR: openDVR, dvr: dvr, dvrEntries: dvrEntries, G: G, dlg: function () { return DLG; }, nextOf: nextOf, VIDX: VIDX, YTP: function () { return YTP; }, job: function () { return job; }, search: searchItems, push: push, rc: rc, rcState: rcState, rcLineup: rcLineup, screens: { srcScreen: srcScreen, WWFK: WWFK, typeScreen2: typeScreen, peopleScreen: peopleScreen, genresScreen: genresScreen, decadeScreen: decadeScreen, typeScreen: typeScreen, networksScreen: networksScreen, azScreen: azScreen, searchScreen: searchScreen } };
     W.addEventListener("cable-unlock", function () { try { if (!S.started) $("#pwbtn").focus(); } catch (e) {} });
     if (/[?&]autostart=1/.test(location.search)) { if (W.CABLE_GATE && W.CABLE_GATE.locked) W.addEventListener("cable-unlock", function () { powerOn(); }); else powerOn(); }
   }).catch(function (e) { $(".pw-load").textContent = "Couldn't load the lineup - check your connection."; try { if (W.__cableReport) W.__cableReport("Startup: " + (e && (e.message || e) || "unknown") + (e && e.stack && String(e.stack).split("\n")[1] ? " @ " + String(e.stack).split("\n")[1].trim().slice(0, 120) : "")); } catch (x) {} });
