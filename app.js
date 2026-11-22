@@ -1447,5 +1447,5 @@
     W.CABLE = { S: S, CH: CH, at: at, tune: tune, key: key, V: V, openOD: openOD, openGuide: openGuide, openDVR: openDVR, dvr: dvr, dvrEntries: dvrEntries, G: G, dlg: function () { return DLG; }, nextOf: nextOf, VIDX: VIDX, YTP: function () { return YTP; }, job: function () { return job; }, search: searchItems, push: push, screens: { srcScreen: srcScreen, WWFK: WWFK, typeScreen2: typeScreen, peopleScreen: peopleScreen, genresScreen: genresScreen, decadeScreen: decadeScreen, typeScreen: typeScreen, networksScreen: networksScreen, azScreen: azScreen, searchScreen: searchScreen } };
     W.addEventListener("cable-unlock", function () { try { if (!S.started) $("#pwbtn").focus(); } catch (e) {} });
     if (/[?&]autostart=1/.test(location.search)) { if (W.CABLE_GATE && W.CABLE_GATE.locked) W.addEventListener("cable-unlock", function () { powerOn(); }); else powerOn(); }
-  }).catch(function (e) { $(".pw-load").textContent = "Couldn't load the lineup - check your connection."; });
+  }).catch(function (e) { $(".pw-load").textContent = "Couldn't load the lineup - check your connection."; try { if (W.__cableReport) W.__cableReport("Startup: " + (e && (e.message || e) || "unknown") + (e && e.stack && String(e.stack).split("\n")[1] ? " @ " + String(e.stack).split("\n")[1].trim().slice(0, 120) : "")); } catch (x) {} });
 })();

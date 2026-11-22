@@ -2,6 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>
+/* Boot guard (2026-11-21, Fire TV blue-screen work): any script error / failed script or stylesheet load before Cable has
+   started shows as readable text (with the device + WebView version) instead of an empty screen; a 30 s watchdog says so if the
+   lineup never finishes loading. After a normal start it stays silent (add ?debug=1 to keep it on). Also: Cable app 1.0 for
+   Fire TV / Google TV (the one with the blue-screen bug) gets an "update the app" notice. Plain ES5, no dependencies. */
+(function () {
+  var W = window, D = document, E = W.__cableErrors = [], box = null, dbg = /[?&]debug=1/.test(location.search);
+  function N(f) { try { return W.CableNative && W.CableNative[f] ? String(W.CableNative[f]()) : ""; } catch (e) { return ""; } }
+  function env() { var m = /Chrome\/([\d.]+)/.exec(navigator.userAgent), a = N("version");
+    return (a ? "Cable app " + a + " \u00b7 " : "") + (N("webview") || (m ? "Chrome " + m[1] : navigator.userAgent.slice(0, 80))) + (N("device") ? " \u00b7 " + N("device") : "") + " \u00b7 " + (W.innerWidth + "x" + W.innerHeight); }
+  function started() { return !!(W.CABLE && W.CABLE.S && W.CABLE.S.started); }
+  function show(msg) {
+    if (!D.body) { D.addEventListener("DOMContentLoaded", function () { show(msg); }); return; }
+    if (!box) {
+      box = D.createElement("div"); box.id = "cable-bootmsg"; box.setAttribute("role", "alert");
+      box.style.cssText = "position:fixed;left:4%;right:4%;bottom:5%;z-index:2147483646;background:#000;border:3px solid #ffcc00;border-radius:10px;padding:14px 18px;color:#fff;font:16px/1.4 Verdana,Tahoma,sans-serif;text-align:left;box-shadow:0 6px 30px rgba(0,0,0,.6)";
+      box.innerHTML = '<b style="color:#ffcc00">Cable had a problem starting.</b> <span class="bm-hint" style="color:#cfe0ff">Press OK to try again.</span><div class="bm-l" style="margin-top:6px;font-size:13px;color:#ddd;word-break:break-word"></div><div class="bm-env" style="margin-top:6px;font-size:11px;color:#9fb6ea"></div>';
+      D.body.appendChild(box);
+      D.addEventListener("keydown", function (e) { if (!box || box.hidden) return; if (e.key === "Enter" || e.keyCode === 13 || e.keyCode === 23) { e.preventDefault(); e.stopImmediatePropagation(); location.reload(); } else if (e.key === "Escape" || e.keyCode === 27) { box.hidden = true; } }, true);
+      box.addEventListener("click", function () { location.reload(); });
+    }
+    box.hidden = false;
+    var l = box.querySelector(".bm-l"), r = D.createElement("div"); r.textContent = msg; l.appendChild(r); while (l.childNodes.length > 4) l.removeChild(l.firstChild);
+    box.querySelector(".bm-env").textContent = env();
+  }
+  function rep(msg) { msg = String(msg || "").slice(0, 300); if (!msg) return; E.push({ t: Date.now(), m: msg }); if (!started() || dbg) show(msg); }
+  W.addEventListener("error", function (e) {
+    var t = e && e.target;
+    if (t && t !== W && t.tagName) { if (/^(SCRIPT|LINK)$/.test(t.tagName)) { var u = t.src || t.href || ""; if (/chasebdillard-ai\.github\.io|^[^:]*$/.test(u) || u.indexOf(location.host) >= 0) rep("Could not load " + u.split("/").pop()); } return; }
+    if (!e.message || /^Script error\.?$/.test(e.message)) return;   // cross-origin (YouTube etc.): no detail, not ours
+    rep(e.message + (e.filename ? " (" + e.filename.split("/").pop().split("?")[0] + ":" + e.lineno + ")" : ""));
+  }, true);
+  W.addEventListener("unhandledrejection", function (e) { var r = e && e.reason; if (!started()) rep("Startup step failed: " + (r && (r.message || r) || "unknown")); });
+  setTimeout(function () { if (!W.CABLE) rep("Still loading the channel lineup after 30 seconds (slow or no connection?)."); }, 30000);
+  // Cable app 1.0 (Fire TV / Google TV) has the blue-picture bug in the app itself: tell those viewers to reinstall 1.1+ with the same code.
+  var av = N("version");
+  if (av === "1.0") {
+    var up = function () {
+      var n = D.createElement("div"); n.id = "cable-appupd";
+      n.style.cssText = "position:fixed;left:50%;top:4%;transform:translateX(-50%);z-index:2147483645;width:86%;max-width:900px;background:#06164a;border:3px solid #ffcc00;border-radius:10px;padding:14px 20px;color:#fff;font:18px/1.4 Verdana,Tahoma,sans-serif;text-align:center;box-shadow:0 6px 30px rgba(0,0,0,.6)";
+      n.innerHTML = '<b style="color:#ffcc00">Update the Cable app</b> &mdash; this version can show a solid blue screen instead of the picture.<br>Open <b>Downloader</b>, enter code <b style="color:#ffcc00;letter-spacing:2px">4793854</b>, press Go, then <b>Install</b> (your channels and settings stay).';
+      D.body.appendChild(n); setTimeout(function () { if (n.parentNode) n.parentNode.removeChild(n); }, 25000);
+    };
+    if (D.body) up(); else D.addEventListener("DOMContentLoaded", up);
+  }
+  W.__cableDiag = env; W.__cableReport = function (m) { E.push({ t: Date.now(), m: String(m) }); show(String(m).slice(0, 300)); };
+})();
+</script>
 <script src="gate.js?v=7e1be65d"></script>
 <script src="donate.js?v=869e0517"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -147,6 +195,6 @@
     </div>
   </div>
 </div>
-<script src="app.js?v=a805b43d"></script>
+<script src="app.js?v=ccf6cc21"></script>
 </body>
 </html>
