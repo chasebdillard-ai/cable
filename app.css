@@ -155,7 +155,7 @@ img.brand.big{height:14vmin;height:clamp(56px,14vmin,110px);margin:0 auto}
 .g-cell{position:absolute;top:0;bottom:0;padding:.25em .5em;background:linear-gradient(#3654b8,#22409c 55%,#1b3587);border-left:2px solid #000;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:bold;cursor:pointer;line-height:1.25}
 .g-cell small{display:block;font-weight:normal;font-size:.78em;color:#cfe0ff;overflow:hidden;text-overflow:ellipsis}
 .g-cell.mv{background:linear-gradient(#5a3fb0,#3b2790 55%,#301f7c)}
-.g-cell.live{background:linear-gradient(#9b2a2a,#6f1414)}
+.g-cell.live.ovl{background:linear-gradient(#9b2a2a,#6f1414)} /* 2026-11-21: red only for YouTube live overrides; live-feed channels use the normal blue blocks */
 .g-cell.sel{background:linear-gradient(#fff3a6,#ffcc00 55%,#e6a800)!important;color:#000}
 .g-cell.sel small{color:#222}
 .g-cell .arr{color:#ffcc00;margin-right:.25em}

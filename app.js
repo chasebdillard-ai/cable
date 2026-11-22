@@ -204,7 +204,80 @@
   W.__cableCd = function () { var el = $("#ovcd"); return { shown: !!el && !el.hidden, t: el && $(".cd-t", el).textContent }; };
   W.__cableOv = function () { return { on: ovNow(), dead: S.ovDead }; };
   function nextOf(c, p) { var k = (p.k + 1) % c.seq.length; return { k: k, i: c.seq[k], start: p.end, end: p.end + VV[c.seq[k]][2] }; }
-  function progs(c, t0, t1) { if (c.hls) return [{ live: 1, start: t0 - 3600, end: t1 + 3600 }]; var out = [], p = at(c, t0); while (p.start < t1 && out.length < 60) { out.push(p); p = nextOf(c, p); }
+  // ---------- live-feed guide (2026-11-21, Chase): real schedules for the hls/web channels ----------
+  // epg.json (build_epg.py: Xumo / Plex / LG / Samsung + Roku mirrors / Sinclair sites / adultswim.com; UTC epoch) + a client-side live refresh of the
+  // CORS-open guides (Xumo EPG pages, LG Channels schedulelist, Sinclair WP JSON) for channels whose own platform is that guide (epg.json "live").
+  // Live data replaces epg.json inside the span it covers. No data -> one block with the channel's own name/description (never invented programming).
+  var EPG = null, EPGL = {}, epgV = 0, EPGM = {};
+  function epgList(c) {
+    var m = EPGM[c.id]; if (m && m.v === epgV) return m.L;
+    var base = (EPG && EPG.ch && EPG.ch[c.id] && EPG.ch[c.id].p) || [], lv = EPGL[c.id], L = base;
+    if (lv && lv.length) { var a = lv[0][0], b = lv[lv.length - 1][1]; L = base.filter(function (p) { return p[1] <= a; }).concat(lv, base.filter(function (p) { return p[0] >= b; })); }
+    EPGM[c.id] = { v: epgV, L: L }; return L;
+  }
+  function epgFb(c) { var f = EPG && EPG.fb && EPG.fb[c.id]; return f ? { t: f[0], sub: f[1] } : { t: c.name, sub: String(c.tag || "").replace(/^Live:\s*/i, "") }; }
+  function liveProgs(c, t0, t1) {
+    var L = epgList(c), out = [], fb = epgFb(c), cur = t0 - 3600;
+    function fill(a, b) { if (b - a > 60) out.push({ live: 1, fill: 1, start: a, end: b, t: fb.t, sub: fb.sub }); }
+    for (var j = 0; j < L.length; j++) {
+      var p = L[j]; if (p[1] <= t0 - 3600) continue; if (p[0] >= t1 + 3600) break;
+      var nx = L[j + 1], e = nx && nx[0] > p[1] && nx[0] - p[1] < 600 ? nx[0] : p[1]; // short ad/promo gaps join the programme before them
+      if (p[0] > cur) { if (out.length && !out[out.length - 1].fill && p[0] - cur < 600) out[out.length - 1].end = p[0]; else fill(cur, p[0]); }
+      out.push({ live: 1, epg: 1, start: p[0], end: e, t: p[2], sub: p[3], desc: p[4] }); cur = e;
+    }
+    if (cur < t1 + 3600) fill(cur, t1 + 3600);
+    return out;
+  }
+  function liveAt(c, t) { var L = liveProgs(c, t - 1, t + 1); for (var j = 0; j < L.length; j++) if (L[j].start <= t && t < L[j].end) return L[j]; return L[0]; }
+  function liveNext(c, p) { var L = liveProgs(c, p.end, p.end + 1); for (var j = 0; j < L.length; j++) if (L[j].start >= p.end) return L[j]; return null; }
+  function epgParse(s) { return Date.parse(String(s).replace(/([+-]\d\d)(\d\d)$/, "$1:$2")) / 1000; }
+  function epgSet(d) { EPGL = d || {}; epgV++; if (S.mode === "guide") renderGuide(); }
+  function epgLive() {
+    clearTimeout(epgLive.t); epgLive.t = setTimeout(epgLive, 2 * 3600 * 1000);
+    if (!EPG || !EPG.live || !W.fetch) return;
+    var c0 = null; try { c0 = JSON.parse(LS.getItem("cable_epg_live") || "null"); } catch (e) {}
+    if (c0 && c0.t > Date.now() - 2 * 3600 * 1000 && c0.d) { epgSet(c0.d); return; }
+    var lv = EPG.live, out = {}, jobs = [], xoff = {}, lg = {}, sc = {}, t = now();
+    Object.keys(lv).forEach(function (id) { var q = lv[id]; if (q[0] === "xumo") (xoff[q[2]] = xoff[q[2]] || {})[q[1]] = id; else if (q[0] === "lg") lg[q[1]] = id; else if (q[0] === "sinclair") sc[q[1]] = id; });
+    function add(id, L) { L = L.filter(function (p) { return p[1] > p[0] && isFinite(p[0]) && isFinite(p[1]); }); if (!L.length) return; L = (out[id] || []).concat(L).sort(function (a, b) { return a[0] - b[0]; });
+      var u = []; L.forEach(function (p) { if (u.length && p[0] < u[u.length - 1][1]) { if (p[0] <= u[u.length - 1][0]) return; u[u.length - 1][1] = p[0]; } u.push(p); }); out[id] = u; }
+    // Xumo Play EPG (ACAO *): 6-hour blocks per UTC day, 50 channels per page; fetch the block now + the next one, only the pages our channels sit on
+    [t, t + 6 * 3600].forEach(function (tt) { var x = new Date(tt * 1000), dd = x.getUTCFullYear() + ("0" + (x.getUTCMonth() + 1)).slice(-2) + ("0" + x.getUTCDate()).slice(-2), h = Math.floor(x.getUTCHours() / 6);
+      Object.keys(xoff).forEach(function (off) { jobs.push(fetch("https://valencia-app-mds.xumo.com/v2/epg/10006/" + dd + "/" + h + ".json?limit=50&offset=" + off + "&f=asset.title&f=asset.episodeTitle&f=asset.descriptions").then(function (r) { return r.json(); }).then(function (j) {
+        var A = j.assets || {}; (j.channels || []).forEach(function (ch) { var id = xoff[off][String(ch.channelId)]; if (!id) return;
+          add(id, (ch.schedule || []).map(function (s) { var a = A[s.assetId] || {}, ds = a.descriptions || {}; return a.title ? [epgParse(s.start), epgParse(s.end), a.title, a.episodeTitle || "", String(ds.medium || ds.small || ds.tiny || "").slice(0, 220)] : null; }).filter(Boolean)); }); })); }); });
+    // LG Channels schedulelist (ACAO *, X-Device-Country is an allowed header): base64 + zlib JSON
+    if (Object.keys(lg).length && W.DecompressionStream && W.atob) jobs.push(fetch("https://api.lgchannels.com/api/v1.0/schedulelist", { headers: { "X-Device-Country": "US", "X-Device-Language": "en" } }).then(function (r) { return r.text(); }).then(function (b64) {
+      var bin = atob(b64.trim()), u8 = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      return new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream("deflate"))).json(); }).then(function (j) {
+      (j.categories || []).forEach(function (cat) { (cat.channels || []).forEach(function (ch) { var id = lg[String(ch.channelName || "").trim()]; if (!id) return;
+        add(id, (ch.programs || []).map(function (p) { return [epgParse(p.startDateTime), epgParse(p.endDateTime), p.programTitle || "", "", String(p.description || "").slice(0, 220)]; })); }); }); }));
+    // Sinclair networks' own schedule (WordPress JSON, echoes the page origin): times are Eastern wall clock, start times only
+    Object.keys(sc).forEach(function (host) { var days = []; for (var k = -1; k < 3; k++) days.push(etDate(t + k * 86400));
+      jobs.push(fetch("https://" + host + "/wp-json/comet/v1/fetch-all-schedule-days?days=" + days.join(",") + "&timezone=America%2FNew_York").then(function (r) { return r.json(); }).then(function (j) { var st = [];
+        Object.keys(j.html || {}).forEach(function (day) { var doc = new DOMParser().parseFromString(j.html[day], "text/html"), y = +day.slice(0, 4), mo = +day.slice(5, 7), dd = +day.slice(8, 10), prev = -1, add1 = 0;
+          [].forEach.call(doc.querySelectorAll(".single-show"), function (row) { var tm = (row.querySelector(".time div") || {}).textContent || "", m = /(\d{1,2})(?::(\d\d))?\s*(AM|PM)/.exec(tm), ti = row.querySelector(".title a"); if (!m || !ti) return;
+            var hh = +m[1] % 12 + (m[3] === "PM" ? 12 : 0), mi = +(m[2] || 0), mins = hh * 60 + mi; if (prev >= 0 && mins < prev) add1++; prev = mins;
+            var ep = row.querySelector(".episode-title"), de = row.querySelector(".description");
+            st.push([etEpoch(y, mo, dd + add1, hh, mi), ti.textContent.trim(), ep ? ep.textContent.trim() : "", de ? de.textContent.trim().slice(0, 220) : ""]); }); });
+        st.sort(function (a, b) { return a[0] - b[0]; }); var L = [];
+        for (var i = 0; i + 1 < st.length; i++) { if (st[i + 1][0] === st[i][0]) continue; var gap = st[i + 1][0] - st[i][0]; L.push([st[i][0], gap <= 3 * 3600 ? st[i + 1][0] : st[i][0] + 3600, st[i][1], st[i][2], st[i][3]]); }
+        add(sc[host], L); })); });
+    Promise.all(jobs.map(function (p) { return p.catch(function () {}); })).then(function () {
+      if (!Object.keys(out).length) return; epgSet(out); try { LS.setItem("cable_epg_live", JSON.stringify({ t: Date.now(), d: out })); } catch (e) {} });
+  }
+  function etParts(t) { try { var f = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(t * 1000)), o = {};
+    f.forEach(function (x) { o[x.type] = +x.value || x.value; }); return o; } catch (e) { return null; } }
+  function etDate(t) { var o = etParts(t); if (!o) { var x = new Date((t - 5 * 3600) * 1000); return x.toISOString().slice(0, 10); } return o.year + "-" + ("0" + o.month).slice(-2) + "-" + ("0" + o.day).slice(-2); }
+  function etEpoch(y, mo, dd, hh, mi) { var g = Date.UTC(y, mo - 1, dd, hh, mi) / 1000 + 5 * 3600, o = etParts(g); if (!o) return g; // EST guess, then correct by the real New York offset (EDT)
+    var shown = Date.UTC(o.year, o.month - 1, o.day, o.hour % 24, o.minute) / 1000, want = Date.UTC(y, mo - 1, dd, hh, mi) / 1000; return g + (want - shown); }
+  function epgLoad() {
+    if (!W.fetch) return;
+    fetch("epg.json?t=" + Math.floor(Date.now() / 600000)).then(function (r) { return r.json(); }).then(function (j) { EPG = j; epgV++; if (S.mode === "guide") renderGuide(); epgLive(); }).catch(function () { setTimeout(epgLoad, 5 * 60 * 1000); });
+  }
+  setInterval(function () { if (EPG && Date.now() / 1000 - EPG.built > 6 * 3600) { var q = EPG; fetch("epg.json?t=" + Math.floor(Date.now() / 600000)).then(function (r) { return r.json(); }).then(function (j) { if (j.built > q.built) { EPG = j; epgV++; if (S.mode === "guide") renderGuide(); } }).catch(function () {}); } }, 30 * 60 * 1000);
+  W.__cableEpg = function () { return { loaded: !!EPG, built: EPG && EPG.built, live: Object.keys(EPGL), n: EPG ? Object.keys(EPG.ch).length : 0 }; };
+  function progs(c, t0, t1) { if (c.hls) return liveProgs(c, t0, t1); var out = [], p = at(c, t0); while (p.start < t1 && out.length < 60) { out.push(p); p = nextOf(c, p); }
     var L = ovList(t0); L.forEach(function (o) { // a live override replaces the scheduled programs it overlaps
       if (o.ch !== c.id || S.ovDead[ovKey(o)] || o.end <= t0 || o.start >= t1) return; var res = [];
       out.forEach(function (q) { if (q.ov || q.end <= o.start || q.start >= o.end) { res.push(q); return; }
@@ -553,10 +626,12 @@
     var c = CH[S.ch], b = $("#banner");
     $(".bn-num", b).textContent = c.n; $(".bn-logo", b).innerHTML = logo(c);
     $(".bn-clock", b).textContent = clock();
-    if (c.hls) {
-      $(".bn-title", b).textContent = c.name + " - Live";
-      $(".bn-sub", b).textContent = c.tag; $(".bn-bar i", b).style.width = "100%";
-      $(".bn-next", b).innerHTML = "<b>LIVE</b> network feed &middot; schedule at " + esc((c.sched || "").replace(/^https?:\/\//, ""));
+    if (c.hls) { // 2026-11-21: real programme from the live-feed guide (epg.json / live refresh)
+      var lp = liveAt(c, now()), ln = lp && !lp.fill ? liveNext(c, lp) : null;
+      $(".bn-title", b).textContent = lp && !lp.fill ? lp.t : c.name + " - Live";
+      $(".bn-sub", b).textContent = lp && !lp.fill ? hm(lp.start) + " - " + hm(lp.end) + (lp.sub ? "  \u00b7  " + lp.sub : "") + "  \u00b7  " + c.name : c.tag;
+      $(".bn-bar i", b).style.width = lp && !lp.fill ? Math.min(100, Math.max(0, (now() - lp.start) / (lp.end - lp.start) * 100)) + "%" : "100%";
+      $(".bn-next", b).innerHTML = ln && !ln.fill ? "<b>LIVE</b> &middot; <b>Next " + hm(ln.start) + ":</b> " + esc(ln.t + (ln.sub ? " - " + ln.sub : "")) : "<b>LIVE</b> network feed";
     } else if (ovNow()) {
       var o = ovNow(), na = at(c, o.end), nav = V(na.i);
       $(".bn-title", b).textContent = o.title;
@@ -639,7 +714,7 @@
     G.row = Math.max(0, k); var n = rowsVisible(); G.top = Math.max(0, Math.min(G.row - Math.floor(n / 2), list.length - n));
     renderGuide(); place();
   }
-  function selProg() { var list = guideList(), c = CH[list[G.row]]; if (!c) return null; var tt = Math.max(G.t, G.w0), oo = !c.hls && ovFor(c, tt), p = c.hls ? { live: 1, start: G.w0, end: G.w0 + winLen() } : oo ? ovProg(oo) : at(c, tt); return { c: c, p: p }; }
+  function selProg() { var list = guideList(), c = CH[list[G.row]]; if (!c) return null; var tt = Math.max(G.t, G.w0), oo = !c.hls && ovFor(c, tt), p = c.hls ? liveAt(c, tt) : oo ? ovProg(oo) : at(c, tt); return { c: c, p: p }; }
   function gRowHtml(r, list, fv, wl, w1) {
     var c = CH[list[r]], cells = "", rh = G.m.rh;
     progs(c, G.w0, w1).forEach(function (p) {
@@ -647,10 +722,10 @@
       if (Wd <= 0) return;
       var label, sub, cls = "", rec = "";
       if (p.ov) { label = p.ov.title; sub = p.ov.wk && p.ov.vod ? p.ov.ep : (p.ov.vod ? "PREMIERE \u00b7 " : "LIVE \u00b7 ") + (p.ov.src || c.name); cls = p.ov.vod ? " ovl ovv" : " live ovl"; }
-      else if (p.live) { label = c.name + " - Live Feed"; sub = c.tag; cls = " live"; }
+      else if (p.live) { label = p.t; sub = p.sub || (p.fill ? "" : c.name); } // live feeds: same blue blocks as every other channel (2026-11-21)
       else { var v = V(p.i); label = v.sh >= 0 ? SHOWS[v.sh].n : v.t; sub = v.sh >= 0 ? v.t : TYPEN[v.ty] + (v.yr ? " (" + v.yr + ")" : ""); if (v.ty === "M") cls = " mv"; rec = recMark(c, p); }
-      cells += '<div class="g-cell' + cls + (rec ? " recd" : "") + '" data-r="' + r + '" data-t="' + (p.live && !p.ov ? G.w0 : p.start) + '" data-e="' + (p.live && !p.ov ? w1 : p.end) + '" style="left:' + L + "%;width:" + Wd + '%">' +
-        (p.start < G.w0 && !p.live ? '<span class="arr">&#9664;</span>' : "") + rec + esc(label) + "<small>" + esc(sub) + "</small></div>";
+      cells += '<div class="g-cell' + cls + (rec ? " recd" : "") + '" data-r="' + r + '" data-t="' + p.start + '" data-e="' + p.end + '" style="left:' + L + "%;width:" + Wd + '%">' +
+        (p.start < G.w0 && !p.fill ? '<span class="arr">&#9664;</span>' : "") + rec + esc(label) + "<small>" + esc(sub) + "</small></div>";
     });
     return '<div class="g-row' + (c.idx === S.ch ? " cur" : "") + '" data-r="' + r + '" data-c="' + c.idx + '" style="top:' + (r * rh) + 'px"><div class="g-ch" data-r="' + r + '"><span class="num">' + c.n + "</span>" + logo(c) +
       (fv.indexOf(c.id) >= 0 ? '<span class="fav">&#9733;</span>' : "") + '</div><div class="g-prog">' + cells + "</div></div>";
@@ -718,7 +793,10 @@
     if (S.mode !== "guide") return;
     $(".g-clock").textContent = clock();
     var sp = selProg(); if (!sp) return; var c = sp.c, p = sp.p;
-    if (c.hls) { $(".g-ititle").textContent = c.name + " - Live"; $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  LIVE"; $(".g-idesc").textContent = c.tag + ". Real live network feed. Full schedule at " + (c.sched || "").replace(/^https?:\/\//, "") + "."; return; }
+    if (c.hls) { var on = p.start <= now() && now() < p.end;
+      if (p.fill) { $(".g-ititle").textContent = p.t; $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  LIVE"; $(".g-idesc").textContent = (p.sub ? p.sub + ". " : "") + "Live network feed."; return; }
+      $(".g-ititle").textContent = p.t + (p.sub ? ": " + p.sub : ""); $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  " + hm(p.start) + " - " + hm(p.end) + "  \u00b7  " + (on ? "ON NOW \u00b7 LIVE" : "LIVE FEED");
+      $(".g-idesc").textContent = (p.desc ? p.desc + " " : "") + (on ? "" : "Tune in at " + hm(p.start) + ". ") + "Live on " + c.name + "."; return; }
     if (p.ov && p.ov.wk) { $(".g-ititle").textContent = p.ov.title + (p.ov.ep ? ": " + p.ov.ep : ""); $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  " + hm(p.start) + " - " + hm(p.end) + "  \u00b7  " + (p.ov.vod ? "WEEKLY \u00b7 FULL SHOW" : "LIVE"); $(".g-idesc").textContent = p.ov.vod ? "Weekly primetime: " + (p.ov.ei == null ? "a " + p.ov.src + " block of full shows (padded with full matches)" : "a full " + p.ov.src + " show (episode " + (p.ov.ei + 1) + " of " + p.ov.pl + " in the rotation, oldest to newest)") + ". " + c.name + "'s regular mix resumes at " + hm(p.end) + "." : "Live every week from " + p.ov.src + " (official YouTube live stream). If there's no stream, " + c.name + "'s regular mix plays."; return; }
     if (p.ov) { $(".g-ititle").textContent = p.ov.title; $(".g-imeta").textContent = c.n + " " + c.call + "  \u00b7  " + hm(p.start) + " - " + hm(p.end) + "  \u00b7  " + (p.ov.vod ? "PREMIERE" : "LIVE"); $(".g-idesc").textContent = p.ov.vod ? "Special presentation: the full event from " + (p.ov.src || c.name) + ", from the opening bell. " + c.name + "'s regular schedule resumes at " + hm(p.end) + "." : "Live now from " + (p.ov.src || c.name) + ". Free official live stream; " + c.name + "'s regular schedule resumes at " + hm(p.end) + "."; return; }
     var v = V(p.i), sh = v.sh >= 0 ? SHOWS[v.sh] : null;
@@ -733,13 +811,13 @@
     if (k === "up" || k === "down") { var r0 = G.row; G.row = Math.max(0, Math.min(list.length - 1, G.row + (k === "up" ? -1 : 1))); if (r0 !== G.row) { gEnsure(90); gSel(); guideInfoSoon(); } return; }
     if (k === "pgup" || k === "pgdn") { var n = rowsVisible(); G.row = Math.max(0, Math.min(list.length - 1, G.row + (k === "pgup" ? -n : n))); G.top = Math.max(0, Math.min(G.row, list.length - n)); gEnsure(220); gSel(); guideInfoSoon(); return; }
     if (k === "right") {
-      sp = selProg(); var t2 = sp.p.end, w0 = G.w0; if (sp.c.hls) t2 = G.w0 + winLen();
+      sp = selProg(); var t2 = sp.p.end, w0 = G.w0; if (sp.p.fill) t2 = Math.min(t2, G.w0 + winLen());
       G.t = t2 + 1; if (G.t >= G.w0 + winLen()) G.w0 += 1800; if (G.w0 > now() + 86400) G.w0 = Math.floor(now() / 1800) * 1800 + 86400;
       if (G.w0 !== w0) renderGuide(); else { gSel(); guideInfo(); } return;
     }
     if (k === "left") {
       sp = selProg(); var t1 = sp.p.start - 1, min = Math.floor(now() / 1800) * 1800, w0b = G.w0;
-      if (sp.c.hls || t1 < min) { if (G.w0 > min) { G.w0 -= 1800; G.t = Math.max(now(), G.w0); } else { setFilterMenu(); return; } } else { G.t = Math.max(t1, now()); if (G.t < G.w0) G.w0 = Math.max(min, G.w0 - 1800); }
+      if ((sp.p.fill && sp.p.start < G.w0) || t1 < min) { if (G.w0 > min) { G.w0 -= 1800; G.t = Math.max(now(), G.w0); } else { setFilterMenu(); return; } } else { G.t = Math.max(t1, now()); if (G.t < G.w0) G.w0 = Math.max(min, G.w0 - 1800); }
       if (G.w0 !== w0b) renderGuide(); else { gSel(); guideInfo(); } return;
     }
     if (k === "ok") { sp = selProg(); if (!sp) return; if (sp.c.hls || sp.p.ov || sp.p.start <= now() + 1) { tune(sp.c.idx); goLive(); } else { toast(hm(sp.p.start) + ": " + (V(sp.p.i).sh >= 0 ? SHOWS[V(sp.p.i).sh].n : V(sp.p.i).t) + " - not on yet. Press R to record it, or find it in ON DEMAND."); } return; }
@@ -1102,6 +1180,7 @@
   }
   function chItem(c) {
     var info = "<h3>" + c.n + " " + esc(c.name) + '</h3><div class="m">' + esc(c.tag) + "</div>";
+    if (c.hls) { var lq = liveAt(c, now()), lnx = lq && !lq.fill ? liveNext(c, lq) : null; if (lq && !lq.fill) info += '<div><span class="k">On now:</span> ' + esc(lq.t + (lq.sub ? " - " + lq.sub : "")) + "</div>" + (lnx && !lnx.fill ? '<div><span class="k">Next:</span> ' + esc(lnx.t) + "</div>" : ""); }
     if (!c.hls) { var p = at(c, now()), v = V(p.i), n = V(nextOf(c, p).i); info += '<div><span class="k">On now:</span> ' + esc(v.sh >= 0 ? SHOWS[v.sh].n + " - " + v.t : v.t) + '</div><div><span class="k">Next:</span> ' + esc(n.sh >= 0 ? SHOWS[n.sh].n : n.t) + "</div>"; }
     info += '<div><span class="k">Genres:</span> ' + esc(c.g.join(", ")) + "</div>";
     return { label: c.n + "  " + c.name, logo: logo(c), biglogo: logo(c, 1), info: info, ch: c, go: function () { tune(c.idx); goLive(); } };
@@ -1361,7 +1440,7 @@
   loadYT();
   var qv = (d.querySelector('script[src^="app.js"]') || {}).src || ""; qv = (qv.split("?")[1] || "");
   Promise.all([fetch(((d.querySelector('meta[name="cable-cat"]') || {}).content || "catalog.json").replace(/\?v=0$/, "") + (location.search.indexOf("nocache") >= 0 ? (/\?/.test(((d.querySelector('meta[name="cable-cat"]') || {}).content || "").replace(/\?v=0$/, "")) ? "&" : "?") + Date.now() : "")).then(function (r) { return r.json(); }), fetch(/v=[0-9a-f]{8}$/.test((d.querySelector('meta[name="cable-live"]') || {}).content || "") ? d.querySelector('meta[name="cable-live"]').content : "live.json?" + Math.floor(Date.now() / 3600000)).then(function (r) { return r.json(); })]).then(function (a) {
-    CAT = a[0]; LIVE = a[1]; prep();
+    CAT = a[0]; LIVE = a[1]; prep(); epgLoad();
     $(".pw-load").textContent = CH.length + " channels \u00b7 " + VV.length.toLocaleString() + " free programs ON DEMAND";
     var b = $("#pwbtn"); b.disabled = false; if (IS_TV) b.classList.add("focus"); try { b.focus(); } catch (e) {}
     ccUI(); recUI();
