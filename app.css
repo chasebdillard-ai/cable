@@ -330,3 +330,8 @@ html.tv .bn-act:after{content:"OK = MENU";display:block;font-size:10px;font-weig
 /* 2026-11-21 web-page channels (82 Weatherscan): full-screen iframe; taps go to the page (its one-time setup screen needs a tap) */
 #web{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;border:0;background:#000;z-index:1}
 #screen.webon #tap{pointer-events:none}
+
+/* memorial card (2026-11-27): lower-left of the picture on Wrestling Network 79 */
+#ovmem{position:absolute;z-index:3;left:max(6px,2.6%);bottom:max(8px,5%);width:26%;min-width:140px;max-width:440px;pointer-events:none;filter:drop-shadow(0 2px 8px rgba(0,0,0,.55))}
+#ovmem[hidden]{display:none}
+#ovmem img{display:block;width:100%;height:auto}

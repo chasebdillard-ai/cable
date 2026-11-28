@@ -187,6 +187,19 @@
     el.hidden = false;
   }
   setInterval(tkTick, 1000);
+  // memorial graphic (2026-11-27, Chase): "In Loving Memory" card for Bronson Reed (Jermaine Haley, 1988-2026), lower-left of the picture
+  // on Wrestling Network 79 during live TV only (hidden in the guide preview, ON DEMAND and on live HLS feeds). Window: 1795831200..1798434000 (Nov 27 9 PM ET to Dec 28 12 AM ET).
+  var MEM = [{ ch: "wrestlingnet", start: 1795831200, end: 1798434000, img: "mem/bronson-reed.png", alt: "In loving memory: Bronson Reed, Jermaine Haley, 1988 to 2026" }];
+  function memTick() {
+    var el = $("#ovmem"); if (!el) return; var c = !S.vod && S.started && S.mode === "tv" ? CH[S.ch] : null, t = now(), m = null;
+    if (c && !c.hls) for (var j = 0; j < MEM.length; j++) if (MEM[j].ch === c.id && t >= MEM[j].start && t < MEM[j].end) { m = MEM[j]; break; }
+    var bn = $("#banner"); if (m && bn && !bn.hidden && bn.offsetHeight) m = null; // step aside while the channel banner is up (same corner)
+    if (!m) { if (!el.hidden) el.hidden = true; return; }
+    var im = $("img", el); if (el.dataset.k !== m.img) { el.dataset.k = m.img; im.src = m.img; im.alt = m.alt; }
+    el.hidden = false;
+  }
+  setInterval(memTick, 1000);
+  W.__cableMem = function () { var el = $("#ovmem"); return { shown: !!el && !el.hidden, box: el && !el.hidden ? el.getBoundingClientRect().toJSON() : null }; };
   W.__cableTk = function () { var el = $("#cctk"); return { shown: !!el && !el.hidden, live: !!el && el.classList.contains("live"), lb: el && $(".tk-lb", el).textContent, t: el && $(".tk-t", el).textContent, box: el && !el.hidden ? el.getBoundingClientRect().toJSON() : null }; };
   // corner promo + QR (2026-11-20): live.json pr [{ch,start,end,text,qr_url,qr}] -> #ovpr upper-right of the picture (same spot/style as #ovcd), hidden while #ovcd shows.
   // QR edge = 11 % of the picture width (min 48 px, max 176 px) so it scans from across the room on a TV and stays small on phones / guide preview.
